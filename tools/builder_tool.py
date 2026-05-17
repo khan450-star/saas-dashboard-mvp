@@ -25,12 +25,20 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 class BuilderTool(BaseTool):
     name: str = "build_and_deploy"
     description: str = (
-        "Given a Technical Specification Document (TSD) as JSON, generate the "
+        "Given a Technical Specification Document (TSD) as JSON string, generate the "
         "full codebase with Claude and write it to a local output folder. "
+        "Pass the TSD object serialized as JSON: tsd_json=json.dumps(tsd_dict). "
         "Returns the local path and file count."
     )
 
-    def _run(self, tsd_json: str) -> str:
+    def _run(self, tsd_json: str = "") -> str:
+        if not tsd_json or tsd_json.strip() == "":
+            return json.dumps({
+                "error": "tsd_json parameter is required and cannot be empty",
+                "project_dir": "",
+                "files_generated": 0,
+                "build_status": "error",
+            }, indent=2)
         if settings.builder_mock:
             return self._mock_build(tsd_json)
         return self._live_build(tsd_json)
