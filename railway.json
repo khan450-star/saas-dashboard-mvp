@@ -1,0 +1,11 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "deploy": {
+    "buildCommand": "python -m pip install --upgrade pip && python -m pip install -r requirements.txt",
+    "startCommand": "python -c \"import os, uvicorn; uvicorn.run('orchestrator:app', host='0.0.0.0', port=int(os.getenv('PORT', '8000')))\"",
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 180,
+    "restartPolicyType": "on_failure",
+    "restartPolicyMaxRetries": 5
+  }
+}

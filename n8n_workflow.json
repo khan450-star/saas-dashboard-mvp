@@ -1,0 +1,113 @@
+{
+  "name": "AI Dev Agency — Scheduled Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 6 }]
+        }
+      },
+      "id": "cron-001",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "notes": "Triggers the full pipeline every 6 hours"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/pipeline/trigger",
+        "options": { "timeout": 600000 }
+      },
+      "id": "trigger-001",
+      "name": "Run Full Pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300],
+      "notes": "Calls CrewAI orchestrator — runs Scout→Analyst→Closer→Builder→Auditor with self-healing"
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/runs/latest",
+        "options": {}
+      },
+      "id": "fetch-result",
+      "name": "Fetch Run Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [720, 300],
+      "notes": "Gets the full run record from the history database"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equal",
+              "value2": "pass"
+            }
+          ]
+        }
+      },
+      "id": "check-status",
+      "name": "QA Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [980, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { summary: `Pipeline #${$json.id} PASSED — ${$json.files_generated} files, ${$json.tests_passed}/${$json.tests_run} tests, ${$json.duration_secs?.toFixed(1)}s`, run: $json } }];"
+      },
+      "id": "format-pass",
+      "name": "Format Success",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1240, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { summary: `Pipeline #${$json.id} FAILED — ${$json.tests_failed} test failures, ${$json.fix_attempts} fix attempts`, run: $json } }];"
+      },
+      "id": "format-fail",
+      "name": "Format Failure",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1240, 400],
+      "notes": "Alerts for human review"
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 500],
+      "notes": "Click to run pipeline on demand from n8n UI"
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [[{ "node": "Run Full Pipeline", "type": "main", "index": 0 }]]
+    },
+    "Manual Trigger": {
+      "main": [[{ "node": "Run Full Pipeline", "type": "main", "index": 0 }]]
+    },
+    "Run Full Pipeline": {
+      "main": [[{ "node": "Fetch Run Result", "type": "main", "index": 0 }]]
+    },
+    "Fetch Run Result": {
+      "main": [[{ "node": "QA Passed?", "type": "main", "index": 0 }]]
+    },
+    "QA Passed?": {
+      "main": [
+        [{ "node": "Format Success", "type": "main", "index": 0 }],
+        [{ "node": "Format Failure", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "ai-dev-agency-poc" }
+}

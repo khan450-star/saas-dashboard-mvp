@@ -1,11 +1,11 @@
-import { LucideIcon } from 'lucide-react'
+import { ComponentType } from 'react'
 
 interface StatsCardProps {
   name: string
   value: string
   change: string
   changeType: 'positive' | 'negative'
-  icon: LucideIcon
+  icon: ComponentType<{ className?: string }>
 }
 
 export default function StatsCard({ name, value, change, changeType, icon: Icon }: StatsCardProps) {

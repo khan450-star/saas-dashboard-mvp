@@ -1,0 +1,11 @@
+{
+  "source": "twitter",
+  "title": "Unity 3D Multiplayer FPS Game",
+  "description": "Looking for someone to build a full 3D multiplayer first-person shooter in Unity with Photon networking. Need custom shaders, weapon physics, and matchmaking.",
+  "budget_usd": 8000,
+  "client_name": "Jake Turner",
+  "client_email": "jake@example.com",
+  "posted_at": "2026-03-28T09:00:00Z",
+  "url": "https://x.com/jaketurner/status/example456",
+  "tags": ["unity", "3d", "multiplayer", "fps", "game"]
+}

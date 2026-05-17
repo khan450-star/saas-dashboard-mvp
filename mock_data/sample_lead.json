@@ -1,0 +1,11 @@
+{
+  "source": "upwork",
+  "title": "Build a Next.js SaaS Dashboard",
+  "description": "I need a full-stack Next.js 14 application with Tailwind CSS, Prisma ORM connected to PostgreSQL, Stripe billing integration, and a responsive admin dashboard. The app should have user auth (NextAuth), a landing page, and 3 internal pages: Dashboard, Settings, Billing. Budget is $3,500 and timeline is 2 weeks.",
+  "budget_usd": 3500,
+  "client_name": "Sarah Chen",
+  "client_email": "sarah.chen@example.com",
+  "posted_at": "2026-03-29T14:22:00Z",
+  "url": "https://www.upwork.com/jobs/~example123",
+  "tags": ["next.js", "react", "tailwind", "prisma", "stripe", "saas"]
+}

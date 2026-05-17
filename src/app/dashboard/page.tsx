@@ -1,6 +1,5 @@
-import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import DashboardShell from '@/components/DashboardShell'
 import StatsCard from '@/components/StatsCard'
 import ActivityFeed from '@/components/ActivityFeed'
@@ -71,7 +70,7 @@ const recentActivity = [
 ]
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions)
+  const session = await auth()
   
   if (!session) {
     redirect('/auth/signin')
