@@ -18,7 +18,7 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from crewai import Crew, Process
@@ -818,6 +818,94 @@ _running_run_id: int | None = None
 _scheduler_started = False
 
 
+def _safe_parse_iso(dt: str | None) -> datetime | None:
+    if not dt:
+        return None
+    try:
+        return datetime.fromisoformat(dt)
+    except Exception:
+        return None
+
+
+def _reconcile_stale_running_runs(max_age_minutes: int = 10) -> int:
+    """Mark stale DB runs as error when no in-memory pipeline is active.
+
+    This protects against deployments/restarts terminating background threads
+    before they can finalize run status.
+    """
+    with _running_lock:
+        current_run = _running_run_id
+
+    # If an in-memory run is active, do not reconcile anything.
+    if current_run is not None:
+        return 0
+
+    now = datetime.now(timezone.utc)
+    stale_after = timedelta(minutes=max(1, int(max_age_minutes)))
+    fixed = 0
+
+    try:
+        for run in db.list_runs(limit=50):
+            if run.get("status") != "running":
+                continue
+
+            started = _safe_parse_iso(run.get("started_at"))
+            if not started:
+                continue
+
+            # Ensure timezone-aware comparison
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+
+            if (now - started) < stale_after:
+                continue
+
+            rid = int(run.get("id", 0) or 0)
+            if rid <= 0:
+                continue
+
+            existing_error = (run.get("error_message") or "").strip()
+            reconciliation_reason = (
+                "Run auto-closed after process restart; background pipeline thread stopped before status finalization."
+            )
+            merged_error = (
+                f"{existing_error} | {reconciliation_reason}" if existing_error else reconciliation_reason
+            )
+
+            db.finish_run(
+                rid,
+                status="error",
+                leads_found=int(run.get("leads_found") or 0),
+                projects_built=int(run.get("projects_built") or 0),
+                files_generated=int(run.get("files_generated") or 0),
+                tests_run=int(run.get("tests_run") or 0),
+                tests_passed=int(run.get("tests_passed") or 0),
+                tests_failed=int(run.get("tests_failed") or 0),
+                fix_attempts=int(run.get("fix_attempts") or 0),
+                result_json=(run.get("result_json") or "")[:10000],
+                error_message=merged_error[:2000],
+                project_name=(run.get("project_name") or "")[:255],
+                project_dir=(run.get("project_dir") or "")[:1000],
+                budget_usd=float(run.get("budget_usd") or 0),
+                client_name=(run.get("client_name") or "")[:255],
+                tech_stack=(run.get("tech_stack") or "")[:1000],
+                description=(run.get("description") or "")[:1000],
+                pipeline_data=(run.get("pipeline_data") or "")[:80000],
+            )
+            db.add_notification(
+                type="warning",
+                title="Recovered Stale Run",
+                message=f"Run #{rid} was marked error after restart interrupted execution.",
+                link=f"run:{rid}",
+                source="reconciler",
+            )
+            fixed += 1
+    except Exception as e:
+        print(f"  ⚠ Stale-run reconciliation skipped: {e}")
+
+    return fixed
+
+
 def _auto_pipeline_scheduler_loop(interval_minutes: int) -> None:
     """Trigger pipeline runs on a fixed interval for online deployments."""
     global _running_run_id
@@ -843,6 +931,8 @@ def _auto_pipeline_scheduler_loop(interval_minutes: int) -> None:
 @app.on_event("startup")
 async def _startup_scheduler() -> None:
     global _scheduler_started
+    # Heal stale DB rows from prior process restarts before accepting new runs.
+    _reconcile_stale_running_runs()
     if _scheduler_started:
         return
     interval = max(0, int(settings.auto_pipeline_interval_minutes or 0))
@@ -878,6 +968,8 @@ def _bg_pipeline():
 async def trigger_pipeline_endpoint(lead: LeadWebhook | None = None):
     """Trigger a full pipeline run in the background."""
     global _running_run_id
+    # Ensure stale "running" rows do not block the operator's view.
+    _reconcile_stale_running_runs()
     with _running_lock:
         if _running_run_id is not None:
             return {"error": "Pipeline already running", "run_id": _running_run_id}
@@ -892,6 +984,7 @@ async def trigger_pipeline_endpoint(lead: LeadWebhook | None = None):
 
 @app.get("/api/health")
 async def health():
+    reconciled = _reconcile_stale_running_runs()
     with _running_lock:
         running = _running_run_id
     now = datetime.now(timezone.utc)
@@ -917,6 +1010,7 @@ async def health():
         "storage_backend": db.storage_backend(),
         "pipeline_running": running is not None,
         "current_run_id": running,
+        "stale_runs_reconciled": reconciled,
         "output_dir": str(output_dir),
         "projects_on_disk": projects_on_disk,
     }
