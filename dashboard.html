@@ -1,0 +1,2303 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aigentic Orbit — Pipeline Dashboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+    :root {
+      --bg: #09161a; --surface: #12262d; --surface2: #19323a; --border: #24515e;
+      --text: #e7f5f8; --muted: #92b4bd; --accent: #00a8a8; --accent-dim: rgba(0,168,168,.18);
+      --green: #27c17d; --green-dim: rgba(39,193,125,.2);
+      --red: #f26d6d; --red-dim: rgba(242,109,109,.2);
+      --yellow: #e5a93b; --yellow-dim: rgba(229,169,59,.2);
+      --blue: #51a9ff; --blue-dim: rgba(81,169,255,.2);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(0, 168, 168, 0.2), transparent 35%),
+        radial-gradient(circle at 85% 10%, rgba(81, 169, 255, 0.12), transparent 34%),
+        linear-gradient(140deg, #071115 0%, #0d2026 52%, #08181d 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Header */
+    header {
+      background: color-mix(in srgb, var(--surface) 90%, black 10%);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+    header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; gap: .5rem; letter-spacing: .01em; }
+    header h1 span { color: var(--accent); }
+    .header-actions { display: flex; gap: .75rem; align-items: center; }
+    .status-pill { display: flex; align-items: center; gap: .4rem; background: var(--surface2); padding: .35rem .75rem; border-radius: 20px; font-size: .8rem; }
+    .status-meta { font-size: .7rem; color: var(--muted); min-width: 120px; text-align: right; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; }
+    .status-dot.offline { background: var(--red); }
+    .status-dot.running { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+    button {
+      background: linear-gradient(135deg, var(--accent), #0fb9b9);
+      color: #fff;
+      border: none;
+      padding: .5rem 1.1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 600;
+      transition: all .15s;
+      font-family: inherit;
+    }
+    button:hover { opacity: .85; transform: translateY(-1px); }
+    button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: var(--border); }
+
+    /* Stats bar */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; padding: 1.5rem 2rem; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem; position: relative; overflow: hidden; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+    .stat-card:hover { background: var(--surface2); transform: translateY(-1px); }
+    .stat-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+    .stat-card.accent::before { background: var(--accent); }
+    .stat-card.green::before { background: var(--green); }
+    .stat-card.red::before { background: var(--red); }
+    .stat-card.blue::before { background: var(--blue); }
+    .stat-card.yellow::before { background: var(--yellow); }
+    .stat-card .label { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .4rem; }
+    .stat-card .value { font-size: 1.6rem; font-weight: 700; }
+    .stat-card .sub { font-size: .7rem; color: var(--muted); margin-top: .2rem; }
+
+    /* Progress banner */
+    .progress-banner { display: none; background: var(--accent-dim); border: 1px solid rgba(99,102,241,.3); margin: 0 2rem; padding: .75rem 1.25rem; border-radius: 8px; font-size: .85rem; color: var(--accent); align-items: center; gap: .75rem; }
+    .progress-banner.show { display: flex; }
+    .progress-bar-track { flex: 1; height: 4px; background: rgba(99,102,241,.2); border-radius: 2px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; animation: indeterminate 1.8s ease-in-out infinite; width: 40%; }
+    @keyframes indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+
+    /* Runs table */
+    .table-wrap { padding: 1rem 2rem 2rem; }
+    .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
+    .table-header h2 { font-size: 1rem; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 10px; overflow: hidden; }
+    th, td { padding: .7rem 1rem; text-align: left; border-bottom: 1px solid var(--border); font-size: .85rem; }
+    th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: .65rem; letter-spacing: .05em; background: var(--surface2); }
+    tr:last-child td { border-bottom: none; }
+    tr.clickable:hover td { background: rgba(99, 102, 241, .06); cursor: pointer; }
+    .badge { padding: .2rem .6rem; border-radius: 9999px; font-size: .65rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+    .badge.pass { background: var(--green-dim); color: var(--green); }
+    .badge.fail { background: var(--red-dim); color: var(--red); }
+    .badge.error { background: var(--yellow-dim); color: var(--yellow); }
+    .badge.running { background: var(--accent-dim); color: var(--accent); }
+    .mono { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: .8rem; }
+    .project-name { color: var(--text); font-size: .8rem; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+    .client-name { color: var(--muted); font-size: .7rem; margin-top: .1rem; }
+    .budget { color: var(--green); font-weight: 600; font-size: .85rem; }
+    .tech-pills { display: flex; gap: .25rem; flex-wrap: wrap; margin-top: .2rem; }
+    .tech-pill { background: var(--accent-dim); color: var(--accent); padding: .1rem .4rem; border-radius: 4px; font-size: .6rem; font-weight: 500; }
+
+    /* Detail panel */
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99; }
+    .overlay.open { display: block; }
+    .detail-panel { display: none; position: fixed; top: 0; right: 0; width: 560px; height: 100vh; background: var(--surface); border-left: 1px solid var(--border); padding: 1.5rem; overflow-y: auto; z-index: 100; box-shadow: -4px 0 20px rgba(0,0,0,.5); }
+    .detail-panel.open { display: block; }
+    .detail-panel h3 { margin-bottom: .5rem; display: flex; justify-content: space-between; align-items: center; }
+    .detail-panel .close-btn { background: none; color: var(--muted); font-size: 1.25rem; padding: .25rem .5rem; }
+    .detail-panel .project-title { font-size: 1.1rem; color: var(--text); margin-bottom: .35rem; font-weight: 600; }
+    .detail-panel .project-sub { font-size: .8rem; color: var(--muted); margin-bottom: 1rem; line-height: 1.4; }
+    .detail-panel .project-meta { display: flex; gap: 1rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+    .detail-panel .meta-chip { display: flex; align-items: center; gap: .4rem; background: var(--bg); padding: .4rem .8rem; border-radius: 8px; font-size: .75rem; }
+    .detail-panel .meta-chip .icon { font-size: 1rem; }
+    .detail-panel .meta-chip .meta-label { color: var(--muted); font-size: .6rem; text-transform: uppercase; letter-spacing: .04em; }
+    .detail-panel .meta-chip .meta-val { font-weight: 600; font-size: .85rem; }
+    .detail-panel .meta-chip.budget-chip .meta-val { color: var(--green); }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-bottom: 1.25rem; }
+    .detail-item { background: var(--bg); padding: .7rem; border-radius: 8px; }
+    .detail-item .label { font-size: .6rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .detail-item .val { font-size: 1rem; font-weight: 600; margin-top: .2rem; }
+    .detail-item .val.pass { color: var(--green); }
+    .detail-item .val.fail { color: var(--red); }
+    .detail-section { margin-bottom: 1rem; }
+    .detail-section h4 { font-size: .8rem; margin-bottom: .4rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .json-block { background: var(--bg); padding: .75rem; border-radius: 8px; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: .7rem; white-space: pre-wrap; word-break: break-all; max-height: 350px; overflow-y: auto; line-height: 1.5; color: var(--muted); }
+    .error-block { background: var(--red-dim); padding: .75rem; border-radius: 8px; font-size: .8rem; color: var(--red); }
+    .desc-block { background: var(--bg); padding: .75rem; border-radius: 8px; font-size: .8rem; color: var(--text); line-height: 1.5; }
+    .tech-stack-block { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .tech-tag { background: var(--accent-dim); color: var(--accent); padding: .25rem .6rem; border-radius: 6px; font-size: .7rem; font-weight: 500; }
+
+    /* Pipeline stages */
+    .stages { display: flex; gap: .5rem; margin-bottom: 1.2rem; }
+    .stage { flex: 1; background: var(--bg); border-radius: 8px; padding: .5rem; text-align: center; }
+    .stage .stage-icon { font-size: 1.1rem; margin-bottom: .15rem; }
+    .stage .stage-name { font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .stage.done { border-bottom: 2px solid var(--green); }
+    .stage.active { border-bottom: 2px solid var(--accent); }
+    .stage.skipped { opacity: .4; }
+
+    /* Timeline dots */
+    .timeline { display: flex; gap: .35rem; align-items: center; margin-top: .25rem; }
+    .timeline .dot { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: .55rem; font-weight: 700; }
+    .timeline .dot.pass { background: var(--green-dim); color: var(--green); }
+    .timeline .dot.fail { background: var(--red-dim); color: var(--red); }
+    .timeline .dot.error { background: var(--yellow-dim); color: var(--yellow); }
+    .timeline .dot.running { background: var(--accent-dim); color: var(--accent); }
+
+    .empty-state { text-align: center; padding: 3rem; color: var(--muted); }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 0; padding: 0 2rem; border-bottom: 1px solid var(--border); background: var(--surface); }
+    .tab { padding: .75rem 1.5rem; font-size: .85rem; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Project Analytics Cards */
+    .projects-grid { display: flex; flex-direction: column; gap: .75rem; }
+    .project-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: border-color .15s, transform .15s; cursor: pointer; }
+    .project-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .project-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .project-card-header { padding: 1.25rem 1.25rem .75rem; }
+    .project-card-header .pc-title { font-size: 1rem; font-weight: 600; margin-bottom: .25rem; display: flex; align-items: center; gap: .5rem; }
+    .project-card-header .pc-run { font-size: .65rem; color: var(--muted); font-family: 'Cascadia Code', monospace; }
+    .project-card-header .pc-date { font-size: .7rem; color: var(--muted); margin-bottom: .5rem; }
+    .project-card-header .pc-desc { font-size: .75rem; color: var(--muted); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .pc-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); }
+    .pc-metric { background: var(--surface); padding: .65rem .75rem; text-align: center; }
+    .pc-metric .pm-val { font-size: 1.1rem; font-weight: 700; }
+    .pc-metric .pm-val.green { color: var(--green); }
+    .pc-metric .pm-val.red { color: var(--red); }
+    .pc-metric .pm-val.blue { color: var(--blue); }
+    .pc-metric .pm-label { font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-top: .15rem; }
+    .pc-body { padding: .75rem 1.25rem 1rem; }
+    .pc-section { margin-bottom: .75rem; }
+    .pc-section:last-child { margin-bottom: 0; }
+    .pc-section-title { font-size: .6rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .4rem; font-weight: 600; }
+    .pc-tech-list { display: flex; gap: .3rem; flex-wrap: wrap; }
+    .pc-tech { background: var(--accent-dim); color: var(--accent); padding: .15rem .5rem; border-radius: 5px; font-size: .65rem; font-weight: 500; }
+    .pc-checklist { list-style: none; padding: 0; }
+    .pc-checklist li { padding: .25rem 0; font-size: .75rem; display: flex; align-items: flex-start; gap: .4rem; line-height: 1.35; }
+    .pc-checklist li .check { color: var(--green); font-weight: 700; flex-shrink: 0; }
+    .pc-checklist li .cross { color: var(--red); font-weight: 700; flex-shrink: 0; }
+    .pc-checklist li .warn { color: var(--yellow); font-weight: 700; flex-shrink: 0; }
+    .pc-bugs { list-style: none; padding: 0; }
+    .pc-bugs li { padding: .3rem .5rem; margin-bottom: .25rem; background: var(--red-dim); border-radius: 6px; font-size: .7rem; color: var(--red); display: flex; align-items: center; gap: .4rem; }
+    .pc-bugs li .bug-sev { font-size: .55rem; text-transform: uppercase; font-weight: 700; padding: .1rem .3rem; border-radius: 3px; background: rgba(239,68,68,.2); }
+    .pc-actions { display: flex; gap: .5rem; padding: .75rem 1.25rem; border-top: 1px solid var(--border); }
+    .pc-actions button { flex: 1; font-size: .75rem; padding: .45rem .75rem; }
+    .pc-actions .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .pc-actions .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+    .pc-status-bar { height: 3px; }
+    .pc-status-bar.pass { background: var(--green); }
+    .pc-status-bar.fail { background: var(--red); }
+    .pc-status-bar.error { background: var(--yellow); }
+    .pc-source-pill { display: inline-flex; align-items: center; gap: .3rem; font-size: .6rem; padding: .2rem .5rem; border-radius: 999px; font-weight: 500; }
+    .pc-source-pill.upwork { background: var(--green-dim); color: var(--green); }
+    .pc-source-pill.portal { background: var(--blue-dim); color: var(--blue); }
+    .pc-source-pill.freelancer { background: var(--yellow-dim); color: var(--yellow); }
+
+    /* Project Profile Panel */
+    .proj-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: calc(100vh - 220px); }
+    .proj-list-col { border-right: 1px solid var(--border); overflow-y: auto; max-height: calc(100vh - 220px); }
+    .proj-detail-col { overflow-y: auto; max-height: calc(100vh - 220px); padding: 1.5rem; }
+    .proj-detail-col .pd-empty { text-align: center; padding: 3rem; color: var(--muted); font-size: .85rem; }
+    .pd-header { margin-bottom: 1.25rem; }
+    .pd-header h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: .25rem; }
+    .pd-header .pd-sub { font-size: .75rem; color: var(--muted); display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+    .pd-section { margin-bottom: 1.25rem; }
+    .pd-section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); margin-bottom: .5rem; border-bottom: 1px solid var(--border); padding-bottom: .3rem; }
+    .pd-info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .5rem; }
+    .pd-info { background: var(--surface2); padding: .5rem .65rem; border-radius: 8px; }
+    .pd-info .pd-label { font-size: .55rem; text-transform: uppercase; color: var(--muted); letter-spacing: .04em; }
+    .pd-info .pd-val { font-size: .85rem; font-weight: 600; margin-top: .1rem; }
+    .pd-stages { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    .pd-stage { display: flex; align-items: center; gap: .3rem; padding: .4rem .6rem; border-radius: 8px; font-size: .75rem; border: 1px solid var(--border); background: var(--surface2); }
+    .pd-stage.done { background: var(--green-dim); border-color: rgba(34,197,94,.3); color: var(--green); }
+    .pd-stage.active { background: var(--accent-dim); border-color: rgba(99,102,241,.3); color: var(--accent); animation: pulse 2s ease-in-out infinite; }
+    .pd-stage.skip { opacity: .4; }
+    .pd-stage-arrow { color: var(--muted); font-size: .7rem; }
+    .pd-lead-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: .85rem; }
+    .pd-lead-box .pd-lead-title { font-weight: 600; font-size: .85rem; margin-bottom: .3rem; }
+    .pd-lead-box .pd-lead-desc { font-size: .75rem; color: var(--muted); line-height: 1.5; margin-bottom: .4rem; }
+    .pd-lead-box .pd-lead-url a { font-size: .7rem; color: var(--accent); text-decoration: none; word-break: break-all; }
+    .pd-lead-box .pd-lead-url a:hover { text-decoration: underline; }
+    .pd-comms { max-height: 350px; overflow-y: auto; }
+    .pd-comm-item { display: flex; gap: .6rem; padding: .65rem .75rem; border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .pd-comm-item:last-child { border-bottom: none; }
+    .pd-comm-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .7rem; flex-shrink: 0; }
+    .pd-comm-avatar.team { background: var(--accent-dim); }
+    .pd-comm-avatar.client { background: var(--green-dim); }
+    .pd-comm-avatar.email { background: var(--blue-dim); }
+    .pd-comm-body { flex: 1; min-width: 0; }
+    .pd-comm-sender { font-size: .7rem; font-weight: 600; margin-bottom: .15rem; }
+    .pd-comm-text { font-size: .75rem; color: var(--muted); line-height: 1.45; }
+    .pd-comm-time { font-size: .6rem; color: var(--muted); margin-top: .2rem; }
+    .pd-notif-list { display: flex; flex-direction: column; gap: .4rem; }
+    .pd-notif-item { display: flex; align-items: center; gap: .5rem; padding: .45rem .65rem; background: var(--surface2); border-radius: 8px; font-size: .75rem; }
+    .pd-notif-item .pd-ni-icon { font-size: .8rem; }
+    .pd-notif-item .pd-ni-text { flex: 1; }
+    .pd-notif-item .pd-ni-time { font-size: .6rem; color: var(--muted); }
+    .pd-kb-item { padding: .5rem .65rem; background: var(--surface2); border-radius: 8px; margin-bottom: .4rem; }
+    .pd-kb-item .pd-kb-q { font-size: .75rem; font-weight: 600; margin-bottom: .15rem; }
+    .pd-kb-item .pd-kb-a { font-size: .72rem; color: var(--muted); line-height: 1.4; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+
+    /* Client Portal */
+    .portal-layout { display: grid; grid-template-columns: 380px 1fr; gap: 0; min-height: calc(100vh - 220px); }
+    .portal-sidebar { background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; }
+    .portal-main { padding: 1.5rem 2rem; overflow-y: auto; }
+    .portal-section-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 1rem 1.25rem .5rem; font-weight: 600; }
+    .request-list { list-style: none; padding: 0; }
+    .request-item { padding: .85rem 1.25rem; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+    .request-item:hover { background: var(--surface2); }
+    .request-item.active { background: var(--accent-dim); border-left: 3px solid var(--accent); }
+    .request-item .ri-title { font-size: .85rem; font-weight: 600; margin-bottom: .15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .request-item .ri-meta { font-size: .7rem; color: var(--muted); display: flex; gap: .5rem; align-items: center; }
+    .request-item .ri-badge { padding: .1rem .4rem; border-radius: 4px; font-size: .55rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+    .ri-badge.new { background: var(--blue-dim); color: var(--blue); }
+    .ri-badge.reviewing { background: var(--yellow-dim); color: var(--yellow); }
+    .ri-badge.in-progress { background: var(--accent-dim); color: var(--accent); }
+    .ri-badge.completed { background: var(--green-dim); color: var(--green); }
+    .ri-badge.archived { background: var(--surface2); color: var(--muted); }
+    .ri-comm { font-size: .6rem; padding: .1rem .35rem; border-radius: 3px; background: var(--surface2); }
+    .new-request-btn { display: block; width: calc(100% - 2.5rem); margin: .75rem 1.25rem; padding: .6rem; text-align: center; border-radius: 8px; font-size: .85rem; }
+
+    /* Intake Form */
+    .intake-form { max-width: 680px; }
+    .intake-form h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: .25rem; }
+    .intake-form .form-sub { font-size: .8rem; color: var(--muted); margin-bottom: 1.5rem; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    .form-row.full { grid-template-columns: 1fr; }
+    .form-group { display: flex; flex-direction: column; }
+    .form-group label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: .35rem; font-weight: 500; }
+    .form-group input, .form-group textarea, .form-group select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: .6rem .85rem; border-radius: 8px; font-size: .85rem; font-family: inherit; transition: border-color .15s; }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+    .form-group textarea { resize: vertical; min-height: 100px; }
+    .form-group select { cursor: pointer; }
+    .comm-options { display: flex; gap: .75rem; }
+    .comm-option { flex: 1; position: relative; }
+    .comm-option input[type="radio"] { position: absolute; opacity: 0; }
+    .comm-option label { display: flex; flex-direction: column; align-items: center; gap: .35rem; padding: .85rem .75rem; background: var(--bg); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all .15s; text-align: center; }
+    .comm-option input[type="radio"]:checked + label { border-color: var(--accent); background: var(--accent-dim); }
+    .comm-option label .comm-icon { font-size: 1.5rem; }
+    .comm-option label .comm-label { font-size: .8rem; font-weight: 600; }
+    .comm-option label .comm-desc { font-size: .65rem; color: var(--muted); }
+    .form-actions { display: flex; gap: .75rem; margin-top: 1.5rem; }
+    .form-actions button { padding: .7rem 1.5rem; font-size: .9rem; }
+    .form-actions .btn-cancel { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+
+    /* Request Detail + Chat */
+    .request-detail { max-width: 720px; }
+    .rd-header { margin-bottom: 1.25rem; }
+    .rd-header h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: .2rem; }
+    .rd-header .rd-sub { font-size: .8rem; color: var(--muted); }
+    .rd-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
+    .rd-info { background: var(--bg); padding: .75rem; border-radius: 8px; }
+    .rd-info .rd-label { font-size: .6rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: .2rem; }
+    .rd-info .rd-val { font-size: .9rem; font-weight: 600; }
+    .rd-desc { background: var(--bg); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: .85rem; line-height: 1.6; color: var(--text); }
+    .rd-status-actions { display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .rd-status-actions button { padding: .4rem .85rem; font-size: .75rem; border-radius: 6px; }
+    .rd-status-actions .active-status { box-shadow: 0 0 0 2px var(--accent); }
+
+    /* Chat */
+    .chat-section { background: var(--bg); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+    .chat-header { padding: .75rem 1rem; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: .8rem; font-weight: 600; display: flex; align-items: center; gap: .5rem; }
+    .chat-messages { max-height: 380px; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .6rem; }
+    .chat-msg { max-width: 80%; padding: .65rem .9rem; border-radius: 12px; font-size: .82rem; line-height: 1.5; }
+    .chat-msg.team { background: var(--accent-dim); color: var(--text); align-self: flex-start; border-bottom-left-radius: 4px; }
+    .chat-msg.client { background: var(--surface2); color: var(--text); align-self: flex-end; border-bottom-right-radius: 4px; }
+    .chat-msg .msg-sender { font-size: .6rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: .2rem; font-weight: 600; }
+    .chat-msg .msg-time { font-size: .6rem; color: var(--muted); margin-top: .25rem; }
+    .chat-input { display: flex; gap: .5rem; padding: .75rem 1rem; border-top: 1px solid var(--border); background: var(--surface); }
+    .chat-input input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: .55rem .85rem; border-radius: 8px; font-size: .82rem; font-family: inherit; }
+    .chat-input input:focus { outline: none; border-color: var(--accent); }
+    .chat-input button { padding: .55rem 1.1rem; font-size: .82rem; }
+    .chat-input .sender-toggle { background: var(--surface2); color: var(--muted); padding: .55rem .75rem; border-radius: 8px; font-size: .7rem; cursor: pointer; border: 1px solid var(--border); min-width: 70px; text-align: center; }
+    .chat-input .sender-toggle.as-team { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+    .portal-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); gap: .75rem; }
+    .portal-empty .pe-icon { font-size: 3rem; opacity: .4; }
+    .portal-empty .pe-text { font-size: .9rem; }
+
+    /* Notifications Bell */
+    .notif-wrapper { position: relative; }
+    .notif-bell { background: var(--surface2); border: 1px solid var(--border); color: var(--text); width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; position: relative; padding: 0; }
+    .notif-bell:hover { background: var(--border); transform: none; }
+    .notif-badge { position: absolute; top: -4px; right: -4px; background: var(--red); color: #fff; font-size: .55rem; font-weight: 700; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+    .notif-badge.hidden { display: none; }
+    .notif-dropdown { display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 400px; max-height: 500px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.4); z-index: 200; overflow: hidden; }
+    .notif-dropdown.open { display: block; }
+    .notif-dropdown-header { display: flex; justify-content: space-between; align-items: center; padding: .75rem 1rem; border-bottom: 1px solid var(--border); }
+    .notif-dropdown-header h3 { font-size: .85rem; font-weight: 600; }
+    .notif-dropdown-header button { font-size: .7rem; padding: .25rem .6rem; background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    .notif-list { max-height: 420px; overflow-y: auto; }
+    .notif-item { display: flex; gap: .75rem; padding: .85rem 1rem; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; align-items: flex-start; }
+    .notif-item:hover { background: var(--surface2); }
+    .notif-item.unread { background: rgba(99,102,241,.04); }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: .9rem; flex-shrink: 0; }
+    .notif-icon.success { background: var(--green-dim); }
+    .notif-icon.error { background: var(--red-dim); }
+    .notif-icon.warning { background: var(--yellow-dim); }
+    .notif-icon.info { background: var(--blue-dim); }
+    .notif-icon.question { background: var(--accent-dim); }
+    .notif-body { flex: 1; min-width: 0; }
+    .notif-body .notif-title { font-size: .8rem; font-weight: 600; margin-bottom: .15rem; }
+    .notif-body .notif-msg { font-size: .72rem; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .notif-body .notif-time { font-size: .6rem; color: var(--muted); margin-top: .25rem; }
+    .notif-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 6px; }
+    .notif-dot.read { opacity: 0; }
+    .notif-empty { text-align: center; padding: 2rem; color: var(--muted); font-size: .8rem; }
+    .notif-resolve-btn { display: inline-block; margin-top: .4rem; font-size: .65rem; padding: .2rem .5rem; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .notif-resolve-btn:hover { opacity: .85; }
+
+    /* Resolve Modal */
+    .resolve-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 300; align-items: center; justify-content: center; }
+    .resolve-overlay.open { display: flex; }
+    .resolve-modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 500px; max-width: 90vw; padding: 1.5rem; }
+    .resolve-modal h3 { margin-bottom: .5rem; font-size: 1rem; }
+    .resolve-modal .rm-question { background: var(--surface2); padding: .75rem; border-radius: 8px; font-size: .8rem; margin-bottom: 1rem; color: var(--muted); }
+    .resolve-modal textarea { width: 100%; min-height: 100px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: .75rem; font-size: .8rem; resize: vertical; }
+    .resolve-modal .rm-actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .75rem; }
+    .resolve-modal .rm-actions button { padding: .4rem 1rem; border-radius: 8px; font-size: .8rem; cursor: pointer; }
+    .resolve-modal .rm-cancel { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .resolve-modal .rm-submit { background: var(--accent); color: #fff; border: none; }
+
+    /* Knowledge Base Tab */
+    .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0 .5rem; }
+    .kb-header h2 { font-size: 1.1rem; }
+    .kb-stats { display: flex; gap: .75rem; }
+    .kb-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: .5rem .85rem; text-align: center; }
+    .kb-stat .kb-stat-val { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+    .kb-stat .kb-stat-lbl { font-size: .6rem; color: var(--muted); text-transform: uppercase; }
+    .kb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1rem; }
+    .kb-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
+    .kb-card-cat { display: inline-block; font-size: .6rem; font-weight: 600; text-transform: uppercase; padding: .15rem .5rem; border-radius: 4px; background: var(--accent-dim); color: var(--accent); margin-bottom: .5rem; }
+    .kb-card-q { font-size: .82rem; font-weight: 600; margin-bottom: .4rem; }
+    .kb-card-a { font-size: .78rem; color: var(--muted); line-height: 1.5; background: var(--surface2); padding: .6rem; border-radius: 6px; margin-bottom: .5rem; }
+    .kb-card-meta { display: flex; justify-content: space-between; align-items: center; font-size: .6rem; color: var(--muted); }
+    .kb-card-actions { display: flex; gap: .4rem; }
+    .kb-card-actions button { font-size: .6rem; padding: .15rem .4rem; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--text); }
+    .kb-card-actions button.delete { color: var(--red); border-color: var(--red-dim); }
+    .kb-add-form { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+    .kb-add-form h3 { font-size:.9rem; margin-bottom:.75rem; }
+    .kb-add-form .kb-row { display: flex; gap: .5rem; margin-bottom: .5rem; }
+    .kb-add-form input, .kb-add-form textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: .5rem; font-size: .8rem; }
+    .kb-add-form textarea { min-height: 60px; resize: vertical; }
+    .kb-add-form select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: .5rem; font-size: .8rem; }
+
+    /* AI Questions Panel */
+    .ai-questions-panel { background: linear-gradient(135deg, rgba(99,102,241,.08), rgba(234,179,8,.06)); border: 1px solid rgba(99,102,241,.25); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem; }
+    .ai-q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .ai-q-header h3 { font-size: 1rem; display: flex; align-items: center; gap: .5rem; }
+    .ai-q-header .ai-q-badge { background: var(--yellow-dim); color: var(--yellow); font-size: .65rem; font-weight: 700; padding: .2rem .55rem; border-radius: 999px; }
+    .ai-q-list { display: flex; flex-direction: column; gap: .75rem; }
+    .ai-q-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: .85rem; transition: border-color .15s; }
+    .ai-q-item.pending { border-left: 3px solid var(--yellow); }
+    .ai-q-item.resolved { border-left: 3px solid var(--green); opacity: .65; }
+    .ai-q-item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .4rem; }
+    .ai-q-stage { font-size: .6rem; font-weight: 600; text-transform: uppercase; padding: .15rem .45rem; border-radius: 4px; background: var(--surface2); color: var(--muted); }
+    .ai-q-time { font-size: .6rem; color: var(--muted); }
+    .ai-q-title { font-size: .8rem; font-weight: 600; color: var(--yellow); margin-bottom: .3rem; }
+    .ai-q-item.resolved .ai-q-title { color: var(--green); }
+    .ai-q-snippet { font-size: .75rem; color: var(--muted); line-height: 1.45; margin-bottom: .6rem; background: var(--surface2); padding: .5rem .65rem; border-radius: 6px; font-style: italic; }
+    .ai-q-answer-box { display: flex; gap: .5rem; align-items: flex-start; }
+    .ai-q-answer-box textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: .5rem; font-size: .78rem; min-height: 50px; resize: vertical; }
+    .ai-q-answer-box button { background: var(--accent); color: #fff; border: none; padding: .5rem .85rem; border-radius: 8px; cursor: pointer; font-size: .75rem; font-weight: 600; white-space: nowrap; align-self: flex-end; }
+    .ai-q-answer-box button:hover { opacity: .85; }
+    .ai-q-resolved-answer { font-size: .75rem; color: var(--green); background: var(--green-dim); padding: .5rem .65rem; border-radius: 6px; line-height: 1.4; }
+    .ai-q-empty { text-align: center; padding: 1.5rem; font-size: .85rem; color: var(--muted); }
+
+    /* AI Chat */
+    .ai-chat-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 1.25rem; display: flex; flex-direction: column; height: 420px; overflow: hidden; }
+    .ai-chat-header { display: flex; justify-content: space-between; align-items: center; padding: .75rem 1rem; border-bottom: 1px solid var(--border); }
+    .ai-chat-header h3 { font-size: .95rem; display: flex; align-items: center; gap: .4rem; }
+    .ai-chat-header button { font-size: .6rem; padding: .2rem .5rem; border-radius: 4px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; }
+    .ai-chat-messages { flex: 1; overflow-y: auto; padding: .75rem 1rem; display: flex; flex-direction: column; gap: .5rem; }
+    .ai-chat-msg { max-width: 85%; padding: .55rem .75rem; border-radius: 10px; font-size: .78rem; line-height: 1.5; word-wrap: break-word; white-space: pre-wrap; }
+    .ai-chat-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+    .ai-chat-msg.assistant { align-self: flex-start; background: var(--surface2); color: var(--text); border-bottom-left-radius: 3px; }
+    .ai-chat-msg.assistant .save-to-kb-btn { display: inline-block; margin-top: .4rem; font-size: .6rem; padding: .15rem .4rem; border-radius: 4px; border: 1px solid var(--accent-dim); background: transparent; color: var(--accent); cursor: pointer; }
+    .ai-chat-msg.assistant .save-to-kb-btn:hover { background: var(--accent-dim); }
+    .ai-chat-msg .msg-time { font-size: .55rem; opacity: .6; margin-top: .2rem; }
+    .ai-chat-typing { align-self: flex-start; color: var(--muted); font-size: .75rem; font-style: italic; padding: .4rem .75rem; }
+    .ai-chat-input { display: flex; gap: .5rem; padding: .75rem 1rem; border-top: 1px solid var(--border); background: var(--bg); }
+    .ai-chat-input textarea { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: .5rem; font-size: .8rem; resize: none; min-height: 38px; max-height: 80px; font-family: inherit; }
+    .ai-chat-input button { background: var(--accent); color: #fff; border: none; padding: .5rem 1rem; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: .8rem; align-self: flex-end; }
+    .ai-chat-input button:disabled { opacity: .5; cursor: not-allowed; }
+    .ai-chat-welcome { text-align: center; padding: 2rem 1rem; color: var(--muted); }
+    .ai-chat-welcome h4 { font-size: .95rem; color: var(--text); margin-bottom: .5rem; }
+    .ai-chat-welcome p { font-size: .75rem; line-height: 1.6; }
+    .ai-chat-suggestions { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; margin-top: .75rem; }
+    .ai-chat-suggestions button { font-size: .68rem; padding: .3rem .6rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; }
+    .ai-chat-suggestions button:hover { border-color: var(--accent); color: var(--accent); }
+
+    @media (max-width: 1100px) {
+      header { flex-direction: column; align-items: flex-start; gap: .8rem; }
+      .header-actions { width: 100%; flex-wrap: wrap; }
+      .status-meta { text-align: left; min-width: auto; }
+      .proj-layout { grid-template-columns: 1fr; }
+      .proj-list-col { max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
+      .proj-detail-col { max-height: none; }
+      .portal-layout { grid-template-columns: 1fr; }
+      .portal-sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+      .detail-panel { width: min(560px, 100vw); }
+    }
+
+    @media (max-width: 760px) {
+      header { padding: .85rem 1rem; }
+      .stats { padding: 1rem; }
+      .tabs { padding: 0 .75rem; overflow-x: auto; }
+      .table-wrap { padding: .75rem 1rem 1.25rem; }
+      .form-row { grid-template-columns: 1fr; }
+      .notif-dropdown { width: min(92vw, 400px); }
+      .detail-grid { grid-template-columns: 1fr; }
+      .pc-metrics { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><span>Aigentic Orbit</span> &mdash; AI Dev Agency</h1>
+  <div class="header-actions">
+    <div class="status-pill">
+      <span class="status-dot" id="healthDot"></span>
+      <span id="healthText">Checking...</span>
+    </div>
+    <div class="status-meta" id="lastUpdated">Syncing...</div>
+    <div class="notif-wrapper">
+      <button class="notif-bell" onclick="toggleNotifications()" title="Notifications">
+        🔔
+        <span class="notif-badge hidden" id="notifBadge">0</span>
+      </button>
+      <div class="notif-dropdown" id="notifDropdown">
+        <div class="notif-dropdown-header">
+          <h3>🔔 Notifications</h3>
+          <button onclick="markAllRead()">Mark all read</button>
+        </div>
+        <div class="notif-list" id="notifList">
+          <div class="notif-empty">No notifications yet</div>
+        </div>
+      </div>
+    </div>
+    <button id="triggerBtn" onclick="triggerRun()">&#9654; Trigger Pipeline</button>
+    <button class="btn-secondary" onclick="loadData()">&#8635; Refresh</button>
+  </div>
+</header>
+
+<div class="progress-banner" id="progressBanner">
+  <span class="spinner"></span>
+  <span id="progressText">Pipeline running...</span>
+  <div class="progress-bar-track"><div class="progress-bar-fill"></div></div>
+</div>
+
+<section class="stats" id="statsBar">
+  <div class="stat-card accent active" data-filter="all" onclick="filterRuns('all')"><div class="label">Total Runs</div><div class="value" id="sTotal">&mdash;</div><div class="sub" id="sLive"></div></div>
+  <div class="stat-card green" data-filter="pass" onclick="filterRuns('pass')"><div class="label">Passed</div><div class="value" id="sPassed">&mdash;</div><div class="sub" id="sPassRate"></div></div>
+  <div class="stat-card red" data-filter="fail" onclick="filterRuns('fail')"><div class="label">Failed</div><div class="value" id="sFailed">&mdash;</div></div>
+  <div class="stat-card green" data-filter="revenue" onclick="filterRuns('revenue')"><div class="label">Revenue</div><div class="value" id="sRevenue">&mdash;</div><div class="sub" id="sPipelineVal"></div></div>
+  <div class="stat-card blue" data-filter="files" onclick="filterRuns('files')"><div class="label">Files Generated</div><div class="value" id="sFiles">&mdash;</div></div>
+  <div class="stat-card green" data-filter="tests" onclick="filterRuns('tests')"><div class="label">Tests</div><div class="value" id="sTests">&mdash;</div><div class="sub" id="sTestRate"></div></div>
+  <div class="stat-card yellow" data-filter="errors" onclick="filterRuns('errors')"><div class="label">Errors</div><div class="value" id="sDuration">&mdash;</div><div class="sub" id="sAvgDur"></div></div>
+  <div class="stat-card accent" data-filter="all" onclick="filterRuns('all')">
+    <div class="label">Recent Runs</div>
+    <div class="timeline" id="sTimeline"></div>
+  </div>
+</section>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('runs')">Pipeline Runs</div>
+  <div class="tab" onclick="switchTab('projects')">Project Analytics</div>
+  <div class="tab" onclick="switchTab('portal')">Client Portal</div>
+  <div class="tab" onclick="switchTab('knowledge')">🧠 Knowledge Base</div>
+</div>
+
+<div id="tabRuns" class="tab-content active">
+<section class="table-wrap">
+  <div class="table-header">
+    <h2>Pipeline Runs <span id="filterBadge" style="display:none; font-size:.7rem; background:var(--accent-dim); color:var(--accent); padding:.2rem .6rem; border-radius:9999px; margin-left:.5rem; font-weight:500; cursor:pointer;" onclick="filterRuns('all')" title="Click to clear filter"></span></h2>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Status</th><th>Project</th><th>Client</th><th>Budget</th>
+        <th>Started</th><th>Files</th><th>Tests</th>
+      </tr>
+    </thead>
+    <tbody id="runsBody">
+      <tr><td colspan="8" class="empty-state">Loading...</td></tr>
+    </tbody>
+  </table>
+</section>
+</div>
+
+<div id="tabProjects" class="tab-content">
+  <div class="proj-layout">
+    <div class="proj-list-col">
+      <div class="projects-grid" id="projectsGrid" style="padding:1rem">
+        <div class="empty-state">Loading projects...</div>
+      </div>
+    </div>
+    <div class="proj-detail-col" id="projDetailCol">
+      <div class="pd-empty">Select a project to see full details, pipeline stages, source, and communications.</div>
+    </div>
+  </div>
+</div>
+
+<div id="tabPortal" class="tab-content">
+  <div class="portal-layout">
+    <div class="portal-sidebar">
+      <button class="new-request-btn" onclick="showIntakeForm()">+ New Project Request</button>
+      <div class="portal-section-title">PROJECT REQUESTS</div>
+      <ul class="request-list" id="requestList">
+        <li style="padding:1rem;color:var(--muted);font-size:.8rem">Loading...</li>
+      </ul>
+    </div>
+    <div class="portal-main" id="portalMain">
+      <div class="portal-empty">
+        <div class="pe-icon">📋</div>
+        <div class="pe-text">Select a request or create a new one</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tabKnowledge" class="tab-content">
+  <div class="kb-header">
+    <h2>🧠 Knowledge Base — AI Learns Here</h2>
+    <div class="kb-stats" id="kbStats"></div>
+  </div>
+
+  <!-- AI Chat Panel -->
+  <div class="ai-chat-panel" id="aiChatPanel">
+    <div class="ai-chat-header">
+      <h3>💬 Ask AI About Your Project</h3>
+      <button onclick="clearChat()">Clear Chat</button>
+    </div>
+    <div class="ai-chat-messages" id="aiChatMessages">
+      <div class="ai-chat-welcome">
+        <h4>🤖 Hi! I'm your project AI assistant</h4>
+        <p>I have full access to your pipeline runs, project files, client data, deployment configs, and code.<br>Ask me anything or tell me what I need to know!</p>
+        <div class="ai-chat-suggestions">
+          <button onclick="chatSuggestion(this)">Show me all projects on disk</button>
+          <button onclick="chatSuggestion(this)">What was the last project built?</button>
+          <button onclick="chatSuggestion(this)">How's the pipeline performing?</button>
+          <button onclick="chatSuggestion(this)">Any client requests pending?</button>
+          <button onclick="chatSuggestion(this)">What do you need from me?</button>
+          <button onclick="chatSuggestion(this)">What files did the latest project generate?</button>
+        </div>
+      </div>
+    </div>
+    <div class="ai-chat-input">
+      <textarea id="aiChatInput" placeholder="Ask anything about your project..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+      <button id="aiChatSendBtn" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+
+  <!-- AI Questions Panel -->
+  <div class="ai-questions-panel" id="aiQuestionsPanel">
+    <div class="ai-q-header">
+      <h3>🤖 AI Wants To Know <span class="ai-q-badge" id="aiQBadge">0</span></h3>
+      <label style="font-size:.7rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:.3rem">
+        <input type="checkbox" id="aiQShowResolved" onchange="loadAIQuestions()"> Show answered
+      </label>
+    </div>
+    <div class="ai-q-list" id="aiQList">
+      <div class="ai-q-empty">Loading...</div>
+    </div>
+  </div>
+
+  <div class="kb-add-form" id="kbAddForm">
+    <h3>+ Teach the AI Something New</h3>
+    <div class="kb-row">
+      <select id="kbCategory">
+        <option value="general">General</option>
+        <option value="payment">Payment</option>
+        <option value="ecommerce">E-commerce</option>
+        <option value="auth">Authentication</option>
+        <option value="database">Database</option>
+        <option value="deployment">Deployment</option>
+        <option value="integration">Integration</option>
+        <option value="realtime">Real-time</option>
+        <option value="media">Media/Files</option>
+      </select>
+      <input id="kbQuestion" placeholder="Question or topic the AI struggled with..." />
+    </div>
+    <div class="kb-row">
+      <textarea id="kbAnswer" placeholder="Your answer — the AI will use this in future runs..."></textarea>
+    </div>
+    <div class="kb-row" style="justify-content:flex-end">
+      <button onclick="addKnowledge()" style="background:var(--accent);color:#fff;border:none;padding:.4rem 1rem;border-radius:8px;cursor:pointer">Save to Knowledge Base</button>
+    </div>
+  </div>
+  <div class="kb-grid" id="kbGrid">
+    <div style="color:var(--muted);font-size:.8rem">Loading knowledge base...</div>
+  </div>
+</div>
+
+<!-- Resolve Question Modal -->
+<div class="resolve-overlay" id="resolveOverlay" onclick="if(event.target===this)closeResolve()">
+  <div class="resolve-modal">
+    <h3>🧠 Answer AI Question</h3>
+    <p style="font-size:.75rem;color:var(--muted);margin-bottom:.75rem">Your answer will be saved to the Knowledge Base. The AI will use it in all future pipeline runs.</p>
+    <div class="rm-question" id="resolveQuestion"></div>
+    <textarea id="resolveAnswer" placeholder="Type your answer here..."></textarea>
+    <div class="rm-actions">
+      <button class="rm-cancel" onclick="closeResolve()">Cancel</button>
+      <button class="rm-submit" onclick="submitResolve()">Save & Teach AI</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel">
+  <h3>
+    Run <span id="dRunId"></span>
+    <button class="close-btn" onclick="closeDetail()">&times;</button>
+  </h3>
+  <div class="project-title" id="dProjectName"></div>
+  <div class="project-sub" id="dDescription"></div>
+
+  <!-- Pipeline stages progress -->
+  <div class="stages" id="dStages">
+    <div class="stage" id="stScout"><div class="stage-icon">🔍</div><div class="stage-name">Scout</div></div>
+    <div class="stage" id="stAnalyst"><div class="stage-icon">📋</div><div class="stage-name">Analyst</div></div>
+    <div class="stage" id="stCloser"><div class="stage-icon">🤝</div><div class="stage-name">Closer</div></div>
+    <div class="stage" id="stBuilder"><div class="stage-icon">🔨</div><div class="stage-name">Builder</div></div>
+    <div class="stage" id="stAuditor"><div class="stage-icon">✅</div><div class="stage-name">Auditor</div></div>
+  </div>
+
+  <!-- Key business metrics -->
+  <div class="project-meta">
+    <div class="meta-chip budget-chip"><div><div class="meta-label">Budget</div><div class="meta-val" id="dBudget">—</div></div></div>
+    <div class="meta-chip"><div><div class="meta-label">Client</div><div class="meta-val" id="dClient">—</div></div></div>
+    <div class="meta-chip"><div><div class="meta-label">Status</div><div class="meta-val" id="dStatus"></div></div></div>
+    <div class="meta-chip"><div><div class="meta-label">Duration</div><div class="meta-val" id="dDuration">—</div></div></div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="detail-item"><div class="label">Leads Found</div><div class="val" id="dLeads"></div></div>
+    <div class="detail-item"><div class="label">Projects Built</div><div class="val" id="dProjects"></div></div>
+    <div class="detail-item"><div class="label">Files Generated</div><div class="val" id="dFiles"></div></div>
+    <div class="detail-item"><div class="label">Tests</div><div class="val" id="dTests"></div></div>
+    <div class="detail-item"><div class="label">Fix Attempts</div><div class="val" id="dFixes"></div></div>
+    <div class="detail-item"><div class="label">Mode</div><div class="val" id="dMock"></div></div>
+  </div>
+
+  <div class="detail-section" id="dTechSection" style="display:none">
+    <h4>Tech Stack</h4>
+    <div class="tech-stack-block" id="dTechStack"></div>
+  </div>
+
+  <div class="detail-section" id="dDescSection" style="display:none">
+    <h4>Project Description</h4>
+    <div class="desc-block" id="dDescFull"></div>
+  </div>
+
+  <div class="detail-section" id="dErrorSection" style="display:none">
+    <h4>Error</h4>
+    <div class="error-block" id="dError"></div>
+  </div>
+
+  <div class="detail-section" id="dProjectDirSection" style="display:none">
+    <h4>Output Directory</h4>
+    <div class="json-block" id="dProjectDir"></div>
+  </div>
+
+  <div class="detail-section">
+    <h4>Result JSON</h4>
+    <div class="json-block" id="dJson"></div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let pipelinePolling = null;
+let allRuns = [];
+let activeFilter = 'all';
+let activeTab = 'runs';
+let allRequests = [];
+let activeRequestId = null;
+let chatSenderIsTeam = true;
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  if (tab === 'runs') {
+    document.querySelector('.tab:nth-child(1)').classList.add('active');
+    document.getElementById('tabRuns').classList.add('active');
+  } else if (tab === 'projects') {
+    document.querySelector('.tab:nth-child(2)').classList.add('active');
+    document.getElementById('tabProjects').classList.add('active');
+    renderProjects(allRuns);
+  } else if (tab === 'portal') {
+    document.querySelector('.tab:nth-child(3)').classList.add('active');
+    document.getElementById('tabPortal').classList.add('active');
+    loadRequests();
+  } else if (tab === 'knowledge') {
+    document.querySelector('.tab:nth-child(4)').classList.add('active');
+    document.getElementById('tabKnowledge').classList.add('active');
+    loadKnowledge();
+  }
+}
+
+function filterRuns(type) {
+  activeFilter = type;
+  // Highlight active card
+  document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+  const card = document.querySelector(`.stat-card[data-filter="${type}"]`);
+  if (card) card.classList.add('active');
+
+  // Filter
+  let filtered;
+  const labels = { all: null, pass: 'Passed', fail: 'Failed', files: 'Files > 0', tests: 'Has Tests', errors: 'Errors', revenue: 'Has Budget' };
+  switch (type) {
+    case 'pass':    filtered = allRuns.filter(r => r.status === 'pass'); break;
+    case 'fail':    filtered = allRuns.filter(r => r.status === 'fail'); break;
+    case 'errors':  filtered = allRuns.filter(r => r.status === 'error'); break;
+    case 'files':   filtered = allRuns.filter(r => (r.files_generated || 0) > 0); break;
+    case 'tests':   filtered = allRuns.filter(r => (r.tests_run || 0) > 0); break;
+    case 'revenue': filtered = allRuns.filter(r => (r.budget_usd || 0) > 0); break;
+    default:        filtered = allRuns; break;
+  }
+  renderRuns(filtered);
+
+  // Update badge
+  const badge = document.getElementById('filterBadge');
+  if (type === 'all') {
+    badge.style.display = 'none';
+  } else {
+    badge.style.display = 'inline';
+    badge.textContent = `${labels[type]} (${filtered.length}) ✕`;
+  }
+}
+
+async function loadData() {
+  try {
+    const [statsRes, runsRes] = await Promise.all([
+      fetch(`${API}/api/runs/stats`), fetch(`${API}/api/runs`)
+    ]);
+    const stats = await statsRes.json();
+    const runs = await runsRes.json();
+    allRuns = runs;
+    renderStats(stats, runs);
+    filterRuns(activeFilter);
+    if (activeTab === 'projects') renderProjects(runs);
+    document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch (e) {
+    console.error('Failed to load data:', e);
+    document.getElementById('lastUpdated').textContent = 'Refresh failed';
+  }
+}
+
+function renderStats(s, runs) {
+  const total = s.total_runs ?? 0;
+  const passed = s.passed ?? 0;
+  const failed = s.failed ?? 0;
+
+  document.getElementById('sTotal').textContent = total;
+  document.getElementById('sLive').textContent = total > 0 ? `${total} total` : '';
+  document.getElementById('sPassed').textContent = passed;
+  document.getElementById('sPassRate').textContent = total > 0 ? `${Math.round(passed / total * 100)}% pass rate` : '';
+  document.getElementById('sFailed').textContent = failed;
+  const rev = s.total_revenue ?? 0;
+  document.getElementById('sRevenue').textContent = rev > 0 ? `$${Number(rev).toLocaleString()}` : '—';
+  const pVal = s.total_pipeline_value ?? 0;
+  document.getElementById('sPipelineVal').textContent = pVal > 0 ? `$${Number(pVal).toLocaleString()} total` : '';
+  document.getElementById('sFiles').textContent = (s.total_files_generated ?? 0).toLocaleString();
+  const tp = s.total_tests_passed ?? 0;
+  const tr = s.total_tests_run ?? 0;
+  document.getElementById('sTests').textContent = `${tp}/${tr}`;
+  document.getElementById('sTestRate').textContent = tr > 0 ? `${Math.round(tp / tr * 100)}% pass rate` : '';
+  document.getElementById('sDuration').textContent = s.errors ?? 0;
+  document.getElementById('sAvgDur').textContent = s.avg_duration_secs ? `avg ${fmtDuration(s.avg_duration_secs)}` : '';
+
+  // Recent runs timeline
+  const recent = (runs || []).slice(0, 12);
+  document.getElementById('sTimeline').innerHTML = recent.reverse().map(r => {
+    const icons = { pass: '✓', fail: '✗', error: '!', running: '…' };
+    return `<div class="dot ${r.status}" title="Run #${r.id}: ${r.status}">${icons[r.status] || '?'}</div>`;
+  }).join('');
+}
+
+function renderRuns(runs) {
+  const tbody = document.getElementById('runsBody');
+  if (!runs.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No runs yet — trigger your first pipeline!</td></tr>';
+    return;
+  }
+  tbody.innerHTML = runs.map(r => {
+    let pName = r.project_name || '';
+    if (!pName && r.result_json) {
+      try {
+        const parsed = JSON.parse(r.result_json);
+        if (Array.isArray(parsed) && parsed[0]?.project_name) pName = parsed[0].project_name;
+      } catch {}
+    }
+    const budget = r.budget_usd ? `$${Number(r.budget_usd).toLocaleString()}` : '—';
+    const client = r.client_name || '—';
+    return `
+    <tr class="clickable" onclick="showDetail(${r.id})">
+      <td class="mono">#${r.id}</td>
+      <td><span class="badge ${r.status}">${r.status}</span></td>
+      <td><span class="project-name" title="${esc(pName)}">${esc(pName) || '—'}</span></td>
+      <td style="color:var(--muted);font-size:.75rem">${esc(client)}</td>
+      <td class="budget">${budget}</td>
+      <td>${fmtDate(r.started_at)}</td>
+      <td>${r.files_generated || '—'}</td>
+      <td class="${r.tests_run > 0 && r.tests_passed === r.tests_run ? 'pass' : r.tests_failed > 0 ? 'fail' : ''}" style="font-weight:500">${r.tests_passed}/${r.tests_run}</td>
+    </tr>`;
+  }).join('');
+}
+
+let selectedProjectId = null;
+
+function renderProjects(runs) {
+  const grid = document.getElementById('projectsGrid');
+
+  // Always include the latest running project, even if it has no name/dir
+  let projects = runs.filter(r => {
+    let pName = r.project_name || '';
+    if (!pName && r.result_json) {
+      try {
+        const parsed = JSON.parse(r.result_json);
+        if (Array.isArray(parsed) && parsed[0]?.project_name) pName = parsed[0].project_name;
+        else if (parsed?.project_name) pName = parsed.project_name;
+      } catch {}
+    }
+    return pName || r.project_dir;
+  });
+  // If there is a running project not in the list, add it
+  const running = runs.find(r => r.status === 'running');
+  if (running && !projects.some(p => p.id === running.id)) {
+    projects = [running, ...projects];
+  }
+
+  if (!projects.length) {
+    grid.innerHTML = '<div class="empty-state">No projects built yet — trigger a pipeline run!</div>';
+    document.getElementById('projDetailCol').innerHTML = '<div class="pd-empty">No projects available.</div>';
+    return;
+  }
+
+  grid.innerHTML = projects.map(r => {
+    let pName = r.project_name || '';
+    if (!pName && r.result_json) {
+      try { const p = JSON.parse(r.result_json); const rp = Array.isArray(p) ? p[0] : p; pName = rp?.project_name || ''; } catch {}
+    }
+    const isCurrentRun = r.status === 'running';
+    const projectRef = (r.project_dir || '').split('/').filter(Boolean).pop() || '';
+    const budget = r.budget_usd ? `$${Number(r.budget_usd).toLocaleString()}` : '';
+    const client = r.client_name || '';
+    const src = guessSource(r);
+    const sel = selectedProjectId === r.id ? ' selected' : '';
+
+    // Mini pipeline phase progress bar
+    const stageNames = ['scout', 'analyst', 'closer', 'builder', 'auditor'];
+    const stageIcons = ['🔍', '📊', '🤝', '🔨', '🧪'];
+    let stages = {};
+    if (r.stages) stages = r.stages;
+    else if (r.result_json) {
+      try { const p = JSON.parse(r.result_json); const rp = Array.isArray(p) ? p[0] : p; stages = rp?.stages || {}; } catch {}
+    }
+    let runStatus = r.status;
+    // Compute stage status
+    let stageStates = stageNames.map(s => stages[s] ? 'done' : 'skip');
+    let activeStageIdx = -1;
+    if (runStatus === 'running') {
+      for (let i = 0; i < stageStates.length; i++) {
+        if (stageStates[i] === 'skip') { stageStates[i] = 'active'; activeStageIdx = i; break; }
+      }
+    }
+    const miniStages = stageNames.map((s, i) =>
+      `<span title="${s.charAt(0).toUpperCase() + s.slice(1)}" style="font-size:1.1em;margin-right:2px;${stageStates[i]==='done'?'color:var(--green);':stageStates[i]==='active'?'color:var(--accent);font-weight:bold;':'opacity:.3;'}">${stageIcons[i]}</span>`
+    ).join('');
+
+    // Show current phase label if running
+    let phaseLabel = '';
+    if (runStatus === 'running') {
+      let phase = r.current_phase || '';
+      if (phase) {
+        const phaseDisplay = phase.charAt(0).toUpperCase() + phase.slice(1);
+        phaseLabel = `<span style="margin-left:.5rem;font-size:.8em;color:var(--accent);font-weight:600;vertical-align:middle;">⏳ In <b>${phaseDisplay}</b> phase</span>`;
+      } else if (activeStageIdx !== -1) {
+        const phaseNames = ['Scout', 'Analyst', 'Closer', 'Builder', 'Auditor'];
+        phaseLabel = `<span style="margin-left:.5rem;font-size:.8em;color:var(--accent);font-weight:600;vertical-align:middle;">⏳ In <b>${phaseNames[activeStageIdx]}</b> phase</span>`;
+      }
+    }
+
+    return `
+    <div class="project-card${sel}" onclick="openProjectProfile(${r.id})" data-pid="${r.id}">
+      <div class="pc-status-bar ${r.status}"></div>
+      <div class="project-card-header" style="padding-bottom:.65rem">
+        <div class="pc-title">
+          <span class="badge ${r.status}">${r.status}</span>
+          ${isCurrentRun ? '<span class="badge running" style="margin-left:.35rem">current run</span>' : ''}
+          ${esc(pName) || 'Unnamed Project'}
+          <span class="pc-run">#${r.id}</span>
+          ${phaseLabel}
+        </div>
+        <div class="pc-date">
+          ${fmtDate(r.started_at)}${r.duration_secs ? ' · ' + fmtDuration(r.duration_secs) : ''}
+          ${client ? ' · ' + esc(client) : ''}
+          ${budget ? ' · ' + budget : ''}
+        </div>
+        <div style="margin-top:.35rem;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+          <span class="pc-source-pill ${src.cls}">${src.icon} ${src.label}</span>
+          ${projectRef ? `<span style="font-size:.65rem;color:var(--muted)">${isCurrentRun ? 'current output' : 'history'}: ${esc(projectRef)}</span>` : ''}
+          <span style="font-size:.65rem;color:var(--muted)">${r.files_generated || 0} files</span>
+          <span style="font-size:.65rem;color:${r.tests_run > 0 && r.tests_passed === r.tests_run ? 'var(--green)' : r.tests_failed > 0 ? 'var(--red)' : 'var(--muted)'}">${r.tests_passed}/${r.tests_run} tests</span>
+        </div>
+        <div style="margin-top:.3rem;display:flex;align-items:center;gap:2px;">${miniStages}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (selectedProjectId && projects.find(r => r.id === selectedProjectId)) {
+    // Keep detail panel for already-selected project
+  } else if (!selectedProjectId) {
+    document.getElementById('projDetailCol').innerHTML = '<div class="pd-empty">Select a project to see full details, pipeline stages, source, and communications.</div>';
+  }
+}
+
+function guessSource(r) {
+  const data = r.pipeline_data || r.result_json || '';
+  const lower = data.toLowerCase();
+  if (lower.includes('upwork')) return { cls: 'upwork', icon: '🟢', label: 'Upwork' };
+  if (lower.includes('freelancer')) return { cls: 'freelancer', icon: '🟡', label: 'Freelancer' };
+  if (lower.includes('portal') || lower.includes('request')) return { cls: 'portal', icon: '🔵', label: 'Client Portal' };
+  return { cls: 'upwork', icon: '🔍', label: 'Lead' };
+}
+
+async function openProjectProfile(runId) {
+  selectedProjectId = runId;
+  // Highlight selected card
+  document.querySelectorAll('.project-card').forEach(el => {
+    el.classList.toggle('selected', Number(el.dataset.pid) === runId);
+  });
+  const col = document.getElementById('projDetailCol');
+  col.innerHTML = '<div class="pd-empty">Loading project profile...</div>';
+
+  try {
+    const res = await fetch(`${API}/api/projects/${runId}/profile`);
+    if (!res.ok) throw new Error('Profile endpoint failed');
+    const p = await res.json();
+    renderProjectProfile(col, p);
+  } catch (e) {
+    console.error(e);
+    col.innerHTML = '<div class="pd-empty">Failed to load project profile. Check server logs.</div>';
+  }
+}
+
+function renderProjectProfile(col, p) {
+  const run = p;
+  const stages = p.stages || {};
+  const req = p.linked_request;
+  const msgs = p.messages || [];
+  const notifs = p.notifications || [];
+  const kbs = p.knowledge || [];
+  const emails = p.email_exchanges || [];
+  const clientReqs = p.client_requirements || [];
+  const analystSummary = p.analyst_summary || '';
+  const projectFiles = p.project_files || [];
+
+  const pName = run.project_name || 'Unnamed Project';
+  const budget = run.budget_usd ? `$${Number(run.budget_usd).toLocaleString()}` : '—';
+  const client = run.client_name || '—';
+  const techStack = run.tech_stack || '';
+  const desc = run.description || p.lead_description || '';
+
+  // Pipeline stages progress
+  const stageNames = ['scout', 'analyst', 'closer', 'builder', 'auditor'];
+  const stageLabels = { scout: '🔍 Scout', analyst: '📊 Analyst', closer: '📧 Closer', builder: '🔨 Builder', auditor: '🧪 Auditor' };
+  const stageStatuses = stageNames.map(s => {
+    if (stages[s]) return 'done';
+    return 'skip';
+  });
+  // If run is still running, mark last non-done as active
+  if (run.status === 'running') {
+    for (let i = 0; i < stageStatuses.length; i++) {
+      if (stageStatuses[i] === 'skip') { stageStatuses[i] = 'active'; break; }
+    }
+  }
+
+  const stagesHtml = stageNames.map((s, i) =>
+    (i > 0 ? '<span class="pd-stage-arrow">→</span>' : '') +
+    `<span class="pd-stage ${stageStatuses[i]}">${stageLabels[s]}</span>`
+  ).join('');
+
+  // Tech stack pills
+  const techHtml = techStack ? techStack.split(',').map(t => t.trim()).filter(Boolean)
+    .map(t => `<span class="pc-tech">${esc(t)}</span>`).join('') : '';
+
+  // Source section
+  let sourceHtml = '';
+  if (p.lead_url || p.lead_title || p.lead_description) {
+    sourceHtml = `
+    <div class="pd-section">
+      <div class="pd-section-title">📌 Lead Source</div>
+      <div class="pd-lead-box">
+        ${p.lead_title ? `<div class="pd-lead-title">${esc(p.lead_title)}</div>` : ''}
+        ${p.lead_description ? `<div class="pd-lead-desc">${esc(p.lead_description).substring(0, 500)}</div>` : ''}
+        ${p.lead_url ? `<div class="pd-lead-url"><a href="${esc(p.lead_url)}" target="_blank" rel="noopener">${esc(p.lead_url)}</a></div>` : ''}
+        ${p.lead_budget ? `<div style="margin-top:.4rem;font-size:.72rem;color:var(--green)">Budget: ${esc(String(p.lead_budget))}</div>` : ''}
+        ${(p.lead_tags||[]).length ? `<div style="margin-top:.4rem;display:flex;gap:.25rem;flex-wrap:wrap">${p.lead_tags.map(t => `<span class="pc-tech">${esc(t)}</span>`).join('')}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // Linked request
+  let reqHtml = '';
+  if (req) {
+    reqHtml = `
+    <div class="pd-section">
+      <div class="pd-section-title">📋 Linked Client Request</div>
+      <div class="pd-lead-box">
+        <div class="pd-lead-title">${esc(req.project_title || 'Untitled')}</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:.3rem">
+          Client: ${esc(req.client_name || '—')} · ${esc(req.client_email || '')} · Status: <span class="badge ${req.status === 'completed' ? 'pass' : req.status === 'in-progress' ? 'running' : ''}">${esc(req.status || 'new')}</span>
+        </div>
+        ${req.description ? `<div class="pd-lead-desc">${esc(req.description).substring(0, 300)}</div>` : ''}
+        ${req.budget_range ? `<div style="font-size:.72rem;margin-top:.3rem">Budget: ${esc(req.budget_range)} · Timeline: ${esc(req.timeline || '—')}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // Communications: merge messages + emails, sorted by time
+  const comms = [];
+  msgs.forEach(m => comms.push({
+    type: m.sender === 'team' ? 'team' : 'client',
+    sender: m.sender === 'team' ? 'Team' : 'Client',
+    text: m.message,
+    time: m.created_at
+  }));
+  emails.forEach(e => comms.push({
+    type: 'email',
+    sender: 'Email → ' + (e.to || 'client'),
+    text: e.project || e.status || 'Email sent',
+    time: ''
+  }));
+
+  let commsHtml = '';
+  if (comms.length) {
+    commsHtml = `
+    <div class="pd-section">
+      <div class="pd-section-title">💬 Communications (${comms.length})</div>
+      <div class="pd-comms">
+        ${comms.map(c => `
+          <div class="pd-comm-item">
+            <div class="pd-comm-avatar ${c.type}">${c.type === 'email' ? '✉' : c.type === 'team' ? 'T' : 'C'}</div>
+            <div class="pd-comm-body">
+              <div class="pd-comm-sender">${esc(c.sender)}</div>
+              <div class="pd-comm-text">${esc(c.text)}</div>
+              ${c.time ? `<div class="pd-comm-time">${fmtDate(c.time)}</div>` : ''}
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Notifications
+  let notifsHtml = '';
+  if (notifs.length) {
+    const iconMap = { success: '✅', error: '❌', warning: '⚠️', question: '❓', info: 'ℹ️' };
+    notifsHtml = `
+    <div class="pd-section">
+      <div class="pd-section-title">🔔 Notifications (${notifs.length})</div>
+      <div class="pd-notif-list">
+        ${notifs.map(n => `
+          <div class="pd-notif-item">
+            <span class="pd-ni-icon">${iconMap[n.type] || 'ℹ️'}</span>
+            <span class="pd-ni-text">${esc(n.message)}</span>
+            <span class="pd-ni-time">${fmtDate(n.created_at)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Knowledge entries
+  let kbHtml = '';
+  if (kbs.length) {
+    kbHtml = `
+    <div class="pd-section">
+      <div class="pd-section-title">🧠 Knowledge Entries (${kbs.length})</div>
+      ${kbs.map(k => `
+        <div class="pd-kb-item">
+          <div class="pd-kb-q">Q: ${esc(k.question)}</div>
+          <div class="pd-kb-a">A: ${esc(k.answer)}</div>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  // Bugs
+  let bugs = [];
+  if (run.result_json) {
+    try { const pr = JSON.parse(run.result_json); const rp = Array.isArray(pr) ? pr[0] : pr; bugs = rp?.bugs || []; } catch {}
+  }
+  let bugsHtml = '';
+  if (bugs.length) {
+    bugsHtml = `
+    <div class="pd-section">
+      <div class="pd-section-title">🐛 Bugs Found (${bugs.length})</div>
+      <ul class="pc-bugs">
+        ${bugs.map(b => `<li><span class="bug-sev">${esc(b.severity || 'bug')}</span> ${esc(b.description || b.id || 'Unknown')}</li>`).join('')}
+      </ul>
+    </div>`;
+  }
+
+  // Client Requirements (from Analyst analysis)
+  let reqsHtml = '';
+  if (clientReqs.length || analystSummary) {
+    let reqCards = '';
+    if (clientReqs.length) {
+      reqCards = clientReqs.map(cr => {
+        const fields = [];
+        if (cr.project_name) fields.push(['Project', cr.project_name]);
+        if (cr.project_type) fields.push(['Type', cr.project_type]);
+        if (cr.complexity) fields.push(['Complexity', cr.complexity]);
+        if (cr.timeline) fields.push(['Timeline', cr.timeline]);
+        if (cr.budget_estimate) fields.push(['Budget Est.', cr.budget_estimate]);
+        if (cr.scope) fields.push(['Scope', typeof cr.scope === 'string' ? cr.scope : JSON.stringify(cr.scope)]);
+        if (cr.tech_stack) fields.push(['Tech Stack', Array.isArray(cr.tech_stack) ? cr.tech_stack.join(', ') : cr.tech_stack]);
+
+        const listItems = [];
+        const arrKeys = ['requirements', 'features', 'pages', 'deliverables'];
+        arrKeys.forEach(k => {
+          if (cr[k]) {
+            const items = Array.isArray(cr[k]) ? cr[k] : [cr[k]];
+            items.forEach(it => listItems.push(esc(typeof it === 'string' ? it : JSON.stringify(it))));
+          }
+        });
+        if (cr.notes) listItems.push(esc(typeof cr.notes === 'string' ? cr.notes : JSON.stringify(cr.notes)));
+
+        return `<div style="background:var(--surface2);border-radius:8px;padding:.65rem;margin-bottom:.4rem">
+          ${fields.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.35rem;margin-bottom:.4rem">
+            ${fields.map(([l,v]) => `<div><span style="font-size:.55rem;text-transform:uppercase;color:var(--muted)">${esc(l)}</span><div style="font-size:.78rem;font-weight:500">${esc(String(v))}</div></div>`).join('')}
+          </div>` : ''}
+          ${listItems.length ? `<ul style="list-style:none;padding:0;margin:0">${listItems.map(i => `<li style="font-size:.75rem;padding:.15rem 0;display:flex;gap:.3rem"><span style="color:var(--accent)">•</span> ${i}</li>`).join('')}</ul>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    let summaryHtml = '';
+    if (analystSummary && !clientReqs.length) {
+      summaryHtml = `<div style="font-size:.75rem;color:var(--muted);line-height:1.5;white-space:pre-wrap;max-height:250px;overflow-y:auto;background:var(--surface2);padding:.65rem;border-radius:8px">${esc(analystSummary)}</div>`;
+    }
+
+    reqsHtml = `
+    <div class="pd-section">
+      <div class="pd-section-title">📋 Client Requirements</div>
+      ${reqCards}${summaryHtml}
+    </div>`;
+  }
+
+  // Project Files
+  let filesHtml = '';
+  if (projectFiles.length) {
+    const maxShow = 30;
+    const shown = projectFiles.slice(0, maxShow);
+    const remaining = projectFiles.length - maxShow;
+    filesHtml = `
+    <div class="pd-section">
+      <div class="pd-section-title">📁 Project Files (${projectFiles.length})</div>
+      <div style="background:var(--surface2);border-radius:8px;padding:.5rem .75rem;max-height:200px;overflow-y:auto;font-family:'Cascadia Code',monospace;font-size:.68rem;line-height:1.6;color:var(--muted)">
+        ${shown.map(f => {
+          const icon = f.endsWith('.tsx') || f.endsWith('.ts') ? '📄' : f.endsWith('.css') ? '🎨' : f.endsWith('.json') ? '⚙️' : f.endsWith('.prisma') ? '🗃️' : '📄';
+          return `<div>${icon} ${esc(f)}</div>`;
+        }).join('')}
+        ${remaining > 0 ? `<div style="color:var(--accent);margin-top:.3rem">… and ${remaining} more files</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  col.innerHTML = `
+    <div class="pd-header">
+      <h2>${esc(pName)}</h2>
+      <div class="pd-sub">
+        <span class="badge ${run.status}">${run.status}</span>
+        <span>Run #${run.id}</span>
+        <span>${fmtDate(run.started_at)}</span>
+        ${run.duration_secs ? `<span>${fmtDuration(run.duration_secs)}</span>` : ''}
+        <span class="pc-source-pill ${guessSource(run).cls}">${guessSource(run).icon} ${guessSource(run).label}</span>
+      </div>
+    </div>
+
+    <div class="pd-section">
+      <div class="pd-section-title">⚙️ Pipeline Progress</div>
+      <div class="pd-stages">${stagesHtml}</div>
+    </div>
+
+    <div class="pd-section">
+      <div class="pd-section-title">📄 Project Details</div>
+      <div class="pd-info-grid">
+        <div class="pd-info"><div class="pd-label">Client</div><div class="pd-val">${esc(client)}</div></div>
+        <div class="pd-info"><div class="pd-label">Budget</div><div class="pd-val" style="color:var(--green)">${budget}</div></div>
+        <div class="pd-info"><div class="pd-label">Files</div><div class="pd-val">${run.files_generated || 0}</div></div>
+        <div class="pd-info"><div class="pd-label">Tests</div><div class="pd-val" style="color:${run.tests_run > 0 && run.tests_passed === run.tests_run ? 'var(--green)' : run.tests_failed > 0 ? 'var(--red)' : 'inherit'}">${run.tests_passed || 0}/${run.tests_run || 0}</div></div>
+        <div class="pd-info"><div class="pd-label">Fix Attempts</div><div class="pd-val">${run.fix_attempts || 0}</div></div>
+        <div class="pd-info"><div class="pd-label">Bugs</div><div class="pd-val" style="color:${bugs.length ? 'var(--red)' : 'var(--green)'}">${bugs.length}</div></div>
+      </div>
+      ${desc ? `<div style="margin-top:.65rem;font-size:.78rem;color:var(--muted);line-height:1.5">${esc(desc)}</div>` : ''}
+      ${techHtml ? `<div style="margin-top:.5rem;display:flex;gap:.3rem;flex-wrap:wrap">${techHtml}</div>` : ''}
+    </div>
+
+    ${sourceHtml}
+    ${reqsHtml}
+    ${reqHtml}
+    ${commsHtml}
+    ${filesHtml}
+    ${notifsHtml}
+    ${kbHtml}
+    ${bugsHtml}
+
+    <div class="pd-section" style="margin-top:.5rem">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+        ${run.deployed_url ? `<a href="${esc(run.deployed_url)}" target="_blank" class="btn" style="font-size:.75rem;padding:.45rem 1rem;background:linear-gradient(135deg,#10b981,#059669);text-decoration:none;color:#fff">🌐 Live Site</a>` : ''}
+        ${run.github_url ? `<a href="${esc(run.github_url)}" target="_blank" class="btn-outline" style="font-size:.75rem;padding:.4rem .8rem;text-decoration:none">📦 GitHub</a>` : ''}
+        ${run.project_dir && !run.deployed_url ? `<button class="btn" onclick="deployToCloud(${run.id})" style="font-size:.75rem;padding:.45rem 1rem;background:linear-gradient(135deg,#6366f1,#8b5cf6)" id="deploy-btn-${run.id}">☁️ Deploy to Cloud</button>` : ''}
+        ${run.project_dir ? `<button class="btn" onclick="openProjectPreview(${run.id})" style="font-size:.75rem;padding:.45rem 1rem">🚀 Open Project</button>` : ''}
+        <button class="btn-outline" onclick="showDetail(${run.id})" style="font-size:.75rem;padding:.4rem .8rem">View Raw Data</button>
+        ${run.project_dir ? `<button class="btn-outline" onclick="navigator.clipboard.writeText('${esc(run.project_dir)}');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Path',1500)" style="font-size:.75rem;padding:.4rem .8rem">Copy Path</button>` : ''}
+      </div>
+      ${run.deployed_url ? `<div style="margin-top:.4rem;font-size:.72rem;color:var(--green)">✓ Deployed: <a href="${esc(run.deployed_url)}" target="_blank" style="color:var(--green)">${esc(run.deployed_url)}</a></div>` : ''}
+    </div>
+  `;
+}
+
+async function openProjectPreview(runId) {
+  const run = allRuns.find(r => r.id === runId);
+  if (!run || !run.project_dir) return alert('No project directory found.');
+  try {
+    const res = await fetch(`${API}/api/projects/${runId}/preview`, { method: 'POST' });
+    const data = await res.json();
+    if (data.url) {
+      window.open(data.url, '_blank');
+    } else {
+      alert(data.message || 'Could not start preview. Check if the project has been built.');
+    }
+  } catch (e) {
+    alert('Failed to start project preview: ' + e.message);
+  }
+}
+
+async function deployToCloud(runId) {
+  const btn = document.getElementById(`deploy-btn-${runId}`);
+  if (btn) { btn.textContent = '☁️ Deploying...'; btn.disabled = true; }
+  try {
+    const res = await fetch(`${API}/api/projects/${runId}/deploy`, { method: 'POST' });
+    const data = await res.json();
+    if (data.deployed) {
+      alert(`✅ Deployed!\n\nLive URL: ${data.vercel_url || 'N/A'}\nGitHub: ${data.github_url || 'N/A'}`);
+      loadRuns(); // Refresh to show live URL buttons
+    } else if (data.github_url) {
+      alert(`📦 Pushed to GitHub: ${data.github_url}\n\n⚠ Vercel deploy failed: ${data.error || 'Unknown'}`);
+      loadRuns();
+    } else {
+      alert(`❌ Deploy failed: ${data.error || 'Unknown error'}\n\nMake sure github_token and vercel_token are set in your .env file.`);
+      if (btn) { btn.textContent = '☁️ Deploy to Cloud'; btn.disabled = false; }
+    }
+  } catch (e) {
+    alert('Deploy failed: ' + e.message);
+    if (btn) { btn.textContent = '☁️ Deploy to Cloud'; btn.disabled = false; }
+  }
+}
+
+// ═══════ Client Portal Functions ═══════
+
+async function loadRequests() {
+  try {
+    const res = await fetch(`${API}/api/requests`);
+    allRequests = await res.json();
+    renderRequestList(allRequests);
+  } catch (e) { console.error('Failed to load requests:', e); }
+}
+
+function renderRequestList(requests) {
+  const list = document.getElementById('requestList');
+  if (!requests.length) {
+    list.innerHTML = '<li style="padding:1.5rem;color:var(--muted);font-size:.8rem;text-align:center">No project requests yet.<br>Click "+ New Project Request" to start.</li>';
+    return;
+  }
+  list.innerHTML = requests.map(r => `
+    <li class="request-item ${activeRequestId === r.id ? 'active' : ''}" onclick="openRequest(${r.id})">
+      <div class="ri-title">${esc(r.project_title)}</div>
+      <div class="ri-meta">
+        <span class="ri-badge ${r.status}">${r.status}</span>
+        <span>${esc(r.client_name)}</span>
+        <span class="ri-comm">${r.communication === 'email' ? '📧' : r.communication === 'chat' ? '💬' : '📧💬'} ${r.communication}</span>
+        <span>${fmtDate(r.created_at)}</span>
+      </div>
+    </li>
+  `).join('');
+}
+
+function showIntakeForm() {
+  activeRequestId = null;
+  renderRequestList(allRequests);
+  const main = document.getElementById('portalMain');
+  main.innerHTML = `
+    <div class="intake-form">
+      <h2>📋 New Project Request</h2>
+      <p class="form-sub">Tell us what you want to build. We'll review it and get back to you.</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Your Name *</label>
+          <input type="text" id="fName" placeholder="John Smith">
+        </div>
+        <div class="form-group">
+          <label>Email Address *</label>
+          <input type="email" id="fEmail" placeholder="john@example.com">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Company</label>
+          <input type="text" id="fCompany" placeholder="Acme Corp (optional)">
+        </div>
+        <div class="form-group">
+          ${stepDocsHtml}
+          <label>Project Title *</label>
+          <input type="text" id="fTitle" placeholder="E-commerce Dashboard App">
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div class="form-group">
+          <label>Project Description *</label>
+          <textarea id="fDesc" placeholder="Describe what you want built — features, pages, functionality, target audience..."></textarea>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Budget Range</label>
+          <select id="fBudget">
+            <option value="">Select budget range</option>
+            <option value="$500 - $1,000">$500 - $1,000</option>
+            <option value="$1,000 - $2,500">$1,000 - $2,500</option>
+            <option value="$2,500 - $5,000">$2,500 - $5,000</option>
+            <option value="$5,000 - $10,000">$5,000 - $10,000</option>
+            <option value="$10,000+">$10,000+</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Timeline</label>
+          <select id="fTimeline">
+            <option value="">Select timeline</option>
+            <option value="ASAP (1-2 days)">ASAP (1-2 days)</option>
+            <option value="This week">This week</option>
+            <option value="1-2 weeks">1-2 weeks</option>
+            <option value="1 month">1 month</option>
+            <option value="Flexible">Flexible</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tech Preferences</label>
+          <input type="text" id="fTech" placeholder="e.g. Next.js, React, Tailwind, Node.js">
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="fPriority">
+            <option value="normal">Normal</option>
+            <option value="low">Low</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div class="form-group">
+          <label>Preferred Communication *</label>
+          <div class="comm-options">
+            <div class="comm-option">
+              <input type="radio" name="comm" id="commEmail" value="email" checked>
+              <label for="commEmail">
+                <span class="comm-icon">📧</span>
+                <span class="comm-label">Email</span>
+                <span class="comm-desc">Updates via email</span>
+              </label>
+            </div>
+            <div class="comm-option">
+              <input type="radio" name="comm" id="commChat" value="chat">
+              <label for="commChat">
+                <span class="comm-icon">💬</span>
+                <span class="comm-label">Chat</span>
+                <span class="comm-desc">Real-time messaging here</span>
+              </label>
+            </div>
+            <div class="comm-option">
+              <input type="radio" name="comm" id="commBoth" value="both">
+              <label for="commBoth">
+                <span class="comm-icon">📧💬</span>
+                <span class="comm-label">Both</span>
+                <span class="comm-desc">Email + chat combined</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button onclick="submitRequest()">🚀 Submit Project Request</button>
+        <button class="btn-cancel" onclick="cancelForm()">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+async function submitRequest() {
+  const name = document.getElementById('fName').value.trim();
+  const email = document.getElementById('fEmail').value.trim();
+  const title = document.getElementById('fTitle').value.trim();
+  const desc = document.getElementById('fDesc').value.trim();
+
+  if (!name || !title || !desc) {
+    alert('Please fill in Name, Project Title, and Description.');
+    return;
+  }
+
+  const comm = document.querySelector('input[name="comm"]:checked')?.value || 'email';
+
+  try {
+    const res = await fetch(`${API}/api/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_name: name,
+        client_email: email,
+        company: document.getElementById('fCompany').value.trim(),
+        project_title: title,
+        description: desc,
+        budget_range: document.getElementById('fBudget').value,
+        timeline: document.getElementById('fTimeline').value,
+        tech_preferences: document.getElementById('fTech').value.trim(),
+        communication: comm,
+        priority: document.getElementById('fPriority').value,
+      })
+    });
+    const data = await res.json();
+    if (data.request_id) {
+      await loadRequests();
+      openRequest(data.request_id);
+    }
+  } catch (e) {
+    alert('Failed to submit: ' + e.message);
+  }
+}
+
+function cancelForm() {
+  const main = document.getElementById('portalMain');
+  main.innerHTML = '<div class="portal-empty"><div class="pe-icon">📋</div><div class="pe-text">Select a request or create a new one</div></div>';
+}
+
+async function openRequest(id) {
+  activeRequestId = id;
+  renderRequestList(allRequests);
+
+  const req = allRequests.find(r => r.id === id);
+  if (!req) return;
+
+  // Fetch messages
+  let messages = [];
+  try {
+    const res = await fetch(`${API}/api/requests/${id}/messages`);
+    messages = await res.json();
+  } catch {}
+
+  const main = document.getElementById('portalMain');
+  const techHtml = req.tech_preferences ? req.tech_preferences.split(',').map(t => t.trim()).filter(Boolean)
+    .map(t => `<span class="pc-tech">${esc(t)}</span>`).join('') : '—';
+
+  const statusBtns = ['new','reviewing','in-progress','completed','archived'].map(s =>
+    `<button class="${s === req.status ? 'active-status' : 'btn-secondary'}" onclick="changeRequestStatus(${id}, '${s}')">${s}</button>`
+  ).join('');
+
+  const messagesHtml = messages.map(m => `
+    <div class="chat-msg ${m.sender}">
+      <div class="msg-sender">${m.sender === 'team' ? '🏢 Aigentic Orbit' : '👤 ' + esc(req.client_name)}</div>
+      ${esc(m.message)}
+      <div class="msg-time">${fmtDate(m.created_at)}</div>
+    </div>
+  `).join('');
+
+  main.innerHTML = `
+    <div class="request-detail">
+      <div class="rd-header">
+        <h2>${esc(req.project_title)}</h2>
+        <div class="rd-sub">Request #${req.id} · Submitted ${fmtDate(req.created_at)}</div>
+      </div>
+
+      <div class="rd-info-grid">
+        <div class="rd-info"><div class="rd-label">Client</div><div class="rd-val">${esc(req.client_name)}</div></div>
+        <div class="rd-info"><div class="rd-label">Email</div><div class="rd-val">${esc(req.client_email) || '—'}</div></div>
+        <div class="rd-info"><div class="rd-label">Company</div><div class="rd-val">${esc(req.company) || '—'}</div></div>
+        <div class="rd-info"><div class="rd-label">Budget</div><div class="rd-val" style="color:var(--green)">${esc(req.budget_range) || '—'}</div></div>
+        <div class="rd-info"><div class="rd-label">Timeline</div><div class="rd-val">${esc(req.timeline) || '—'}</div></div>
+        <div class="rd-info"><div class="rd-label">Priority</div><div class="rd-val">${esc(req.priority)}</div></div>
+        <div class="rd-info"><div class="rd-label">Communication</div><div class="rd-val">${req.communication === 'email' ? '📧 Email' : req.communication === 'chat' ? '💬 Chat' : '📧💬 Both'}</div></div>
+        <div class="rd-info"><div class="rd-label">Tech</div><div class="rd-val" style="display:flex;gap:.3rem;flex-wrap:wrap">${techHtml}</div></div>
+      </div>
+
+      ${req.description ? `<div class="rd-desc">${esc(req.description)}</div>` : ''}
+
+      <div class="rd-status-actions">${statusBtns}</div>
+
+      <div class="chat-section">
+        <div class="chat-header">💬 Messages ${req.communication !== 'email' ? '(Live Chat)' : '(Communication Thread)'}</div>
+        <div class="chat-messages" id="chatMessages">${messagesHtml || '<div style="color:var(--muted);text-align:center;padding:2rem;font-size:.8rem">No messages yet. Start the conversation!</div>'}</div>
+        <div class="chat-input">
+          <div class="sender-toggle ${chatSenderIsTeam ? 'as-team' : ''}" onclick="toggleChatSender()" title="Toggle sender">${chatSenderIsTeam ? '🏢 Team' : '👤 Client'}</div>
+          <input type="text" id="chatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMessage(${id})">
+          <button onclick="sendMessage(${id})">Send</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Scroll chat to bottom
+  setTimeout(() => {
+    const chatEl = document.getElementById('chatMessages');
+    if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
+  }, 50);
+}
+
+function toggleChatSender() {
+  chatSenderIsTeam = !chatSenderIsTeam;
+  const el = document.querySelector('.sender-toggle');
+  if (el) {
+    el.className = 'sender-toggle ' + (chatSenderIsTeam ? 'as-team' : '');
+    el.textContent = chatSenderIsTeam ? '🏢 Team' : '👤 Client';
+  }
+}
+
+async function sendMessage(requestId) {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  try {
+    await fetch(`${API}/api/requests/${requestId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender: chatSenderIsTeam ? 'team' : 'client', message: msg })
+    });
+    openRequest(requestId);
+  } catch (e) { console.error('Failed to send message:', e); }
+}
+
+async function changeRequestStatus(requestId, status) {
+  try {
+    await fetch(`${API}/api/requests/${requestId}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    await loadRequests();
+    openRequest(requestId);
+  } catch (e) { console.error('Failed to update status:', e); }
+}
+
+// ═══════ Pipeline Detail Functions ═══════
+
+async function showDetail(id) {
+  try {
+    const res = await fetch(`${API}/api/runs/${id}`);
+    const r = await res.json();
+
+    let pName = r.project_name || '';
+    let pDir = r.project_dir || '';
+    if (r.result_json) {
+      try {
+        const parsed = JSON.parse(r.result_json);
+        if (Array.isArray(parsed) && parsed[0]) {
+          if (!pName && parsed[0].project_name) pName = parsed[0].project_name;
+          if (!pDir && parsed[0].project_dir) pDir = parsed[0].project_dir;
+        }
+      } catch {}
+    }
+
+    document.getElementById('dRunId').textContent = `#${r.id}`;
+    document.getElementById('dProjectName').textContent = pName || 'Unnamed Project';
+    document.getElementById('dDescription').textContent = r.description || '';
+
+    // Budget & client
+    document.getElementById('dBudget').textContent = r.budget_usd ? `$${Number(r.budget_usd).toLocaleString()}` : '—';
+    document.getElementById('dClient').textContent = r.client_name || '—';
+
+    document.getElementById('dStatus').innerHTML = `<span class="badge ${r.status}">${r.status}</span>`;
+    document.getElementById('dDuration').textContent = r.duration_secs ? fmtDuration(r.duration_secs) : '—';
+    document.getElementById('dLeads').textContent = r.leads_found || 0;
+    document.getElementById('dProjects').textContent = r.projects_built || 0;
+    document.getElementById('dFiles').textContent = r.files_generated || 0;
+
+    const testEl = document.getElementById('dTests');
+    testEl.textContent = `${r.tests_passed}/${r.tests_run}`;
+    testEl.className = 'val ' + (r.tests_run > 0 && r.tests_passed === r.tests_run ? 'pass' : r.tests_failed > 0 ? 'fail' : '');
+
+    document.getElementById('dFixes').textContent = r.fix_attempts || 0;
+    document.getElementById('dMock').textContent = r.mock_mode ? 'Mock' : 'Live';
+
+    // Tech stack
+    const techSection = document.getElementById('dTechSection');
+    const techStack = r.tech_stack || '';
+    if (techStack) {
+      techSection.style.display = '';
+      document.getElementById('dTechStack').innerHTML = techStack.split(',')
+        .map(t => t.trim()).filter(Boolean)
+        .map(t => `<span class="tech-tag">${esc(t)}</span>`).join('');
+    } else {
+      techSection.style.display = 'none';
+    }
+
+    // Description
+    const descSection = document.getElementById('dDescSection');
+    const desc = r.description || '';
+    if (desc) {
+      descSection.style.display = '';
+      document.getElementById('dDescFull').textContent = desc;
+    } else {
+      descSection.style.display = 'none';
+    }
+
+    // Pipeline stages
+    const stages = ['Scout', 'Analyst', 'Closer', 'Builder', 'Auditor'];
+    const stageIds = ['stScout', 'stAnalyst', 'stCloser', 'stBuilder', 'stAuditor'];
+    let pipeData = {};
+    try { pipeData = JSON.parse(r.pipeline_data || '{}'); } catch {}
+    const stageKeys = ['scout', 'analyst', 'closer', 'builder', 'auditor'];
+    stageKeys.forEach((key, i) => {
+      const el = document.getElementById(stageIds[i]);
+      el.className = 'stage';
+      if (pipeData[key]) {
+        el.classList.add('done');
+      } else if (r.status === 'running') {
+        // Mark the first non-done stage as active
+        if (i === 0 || pipeData[stageKeys[i-1]]) el.classList.add('active');
+        else el.classList.add('skipped');
+      } else if (r.status === 'error') {
+        el.classList.add('skipped');
+      }
+    });
+
+    // Error section
+    const errSection = document.getElementById('dErrorSection');
+    if (r.error_message) {
+      errSection.style.display = '';
+      document.getElementById('dError').textContent = r.error_message;
+    } else {
+      errSection.style.display = 'none';
+    }
+
+    // Project dir section
+    const dirSection = document.getElementById('dProjectDirSection');
+    if (pDir) {
+      dirSection.style.display = '';
+      document.getElementById('dProjectDir').textContent = pDir;
+    } else {
+      dirSection.style.display = 'none';
+    }
+
+    // Result JSON
+    try {
+      document.getElementById('dJson').textContent = JSON.stringify(JSON.parse(r.result_json || '{}'), null, 2);
+    } catch {
+      document.getElementById('dJson').textContent = r.result_json || '(none)';
+    }
+
+    document.getElementById('detailPanel').classList.add('open');
+    document.getElementById('overlay').classList.add('open');
+  } catch (e) { console.error(e); }
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+
+async function triggerRun() {
+  const btn = document.getElementById('triggerBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Starting...';
+  try {
+    const res = await fetch(`${API}/api/pipeline/trigger`, { method: 'POST' });
+    const data = await res.json();
+    if (data.error) {
+      btn.textContent = 'Already Running';
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = '&#9654; Trigger Pipeline'; }, 3000);
+      return;
+    }
+    btn.innerHTML = '&#9654; Trigger Pipeline';
+    btn.disabled = true;
+    startPipelinePolling(data.run_id);
+  } catch (e) {
+    alert('Failed to trigger: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = '&#9654; Trigger Pipeline';
+  }
+}
+
+function startPipelinePolling(runId) {
+  const banner = document.getElementById('progressBanner');
+  banner.classList.add('show');
+  document.getElementById('progressText').textContent = `Pipeline running (Run #${runId})...`;
+
+  if (pipelinePolling) clearInterval(pipelinePolling);
+  pipelinePolling = setInterval(async () => {
+    try {
+      const hRes = await fetch(`${API}/api/health`);
+      const hData = await hRes.json();
+      if (!hData.pipeline_running) {
+        clearInterval(pipelinePolling);
+        pipelinePolling = null;
+        banner.classList.remove('show');
+        document.getElementById('triggerBtn').disabled = false;
+        await loadData();
+      }
+    } catch {}
+  }, 5000);
+}
+
+async function checkHealth() {
+  try {
+    const res = await fetch(`${API}/api/health`);
+    const data = await res.json();
+    const dot = document.getElementById('healthDot');
+    const text = document.getElementById('healthText');
+    const btn = document.getElementById('triggerBtn');
+
+    if (data.pipeline_running) {
+      dot.className = 'status-dot running';
+      text.textContent = `Running #${data.current_run_id}`;
+      text.title = `Uptime: ${data.uptime_human || 'n/a'}`;
+      btn.disabled = true;
+      document.getElementById('progressBanner').classList.add('show');
+      document.getElementById('progressText').textContent = `Pipeline running (Run #${data.current_run_id})...`;
+      if (!pipelinePolling) startPipelinePolling(data.current_run_id);
+    } else {
+      dot.className = 'status-dot';
+      const mode = data.project_selection_mode ? ` · ${data.project_selection_mode}` : '';
+      text.textContent = `Online${data.mock_mode ? ' (mock)' : ''}${mode}`;
+      text.title = `API ${data.api_refresh_version || ''} | Uptime: ${data.uptime_human || 'n/a'} | Projects: ${data.projects_on_disk ?? 0}`;
+      if (!pipelinePolling) btn.disabled = false;
+    }
+  } catch {
+    document.getElementById('healthDot').className = 'status-dot offline';
+    document.getElementById('healthText').textContent = 'Offline';
+    document.getElementById('lastUpdated').textContent = 'Server offline';
+  }
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+         d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDuration(secs) {
+  if (!secs) return '—';
+  if (secs < 60) return `${secs.toFixed(0)}s`;
+  const m = Math.floor(secs / 60);
+  const s = Math.round(secs % 60);
+  return `${m}m ${s}s`;
+}
+
+function esc(str) {
+  if (!str) return '';
+  const el = document.createElement('span');
+  el.textContent = str;
+  return el.innerHTML;
+}
+
+// Init
+checkHealth();
+loadData();
+loadNotifications();
+setInterval(checkHealth, 8000);
+setInterval(loadData, 15000);
+setInterval(loadNotifications, 10000);
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeDetail(); closeNotifDropdown(); }
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('.notif-wrapper')) closeNotifDropdown();
+});
+
+// ═══════ Notification Functions ═══════
+
+async function loadNotifications() {
+  try {
+    const [countRes, listRes] = await Promise.all([
+      fetch(`${API}/api/notifications/count`),
+      fetch(`${API}/api/notifications?limit=30`)
+    ]);
+    const countData = await countRes.json();
+    const notifications = await listRes.json();
+
+    // Update badge
+    const badge = document.getElementById('notifBadge');
+    if (countData.unread > 0) {
+      badge.textContent = countData.unread > 99 ? '99+' : countData.unread;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+
+    // Render list
+    renderNotifications(notifications);
+  } catch (e) { console.error('Notif load error:', e); }
+}
+
+function renderNotifications(notifications) {
+  const list = document.getElementById('notifList');
+  if (!notifications.length) {
+    list.innerHTML = '<div class="notif-empty">No notifications yet</div>';
+    return;
+  }
+
+  const typeIcons = {
+    success: '✅', error: '❌', warning: '⚠️', info: '📥', question: '❓'
+  };
+
+  list.innerHTML = notifications.map(n => `
+    <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="handleNotifClick(${n.id}, '${esc(n.link || '')}', '${n.type}')">
+      <div class="notif-icon ${n.type}">${typeIcons[n.type] || '📥'}</div>
+      <div class="notif-body">
+        <div class="notif-title">${esc(n.title)}</div>
+        <div class="notif-msg">${esc(n.message)}</div>
+        <div class="notif-time">${fmtDate(n.created_at)}</div>
+        ${n.type === 'question' && !n.is_read ? '<button class="notif-resolve-btn" onclick="event.stopPropagation();openResolve('+n.id+',`'+esc(n.title)+': '+esc(n.message)+'`)">🧠 Answer & Teach AI</button>' : ''}
+      </div>
+      <div class="notif-dot ${n.is_read ? 'read' : ''}"></div>
+    </div>
+  `).join('');
+}
+
+function toggleNotifications() {
+  const dd = document.getElementById('notifDropdown');
+  dd.classList.toggle('open');
+}
+
+function closeNotifDropdown() {
+  document.getElementById('notifDropdown').classList.remove('open');
+}
+
+async function handleNotifClick(id, link, type) {
+  // For question notifications, open the resolve modal instead
+  if (type === 'question') {
+    // Fetch full notification to get title+message
+    try {
+      const res = await fetch(`${API}/api/notifications?limit=100`);
+      const all = await res.json();
+      const n = all.find(x => x.id === id);
+      if (n) {
+        openResolve(id, n.title + ': ' + n.message);
+        closeNotifDropdown();
+        return;
+      }
+    } catch {}
+  }
+  // Mark as read
+  try {
+    await fetch(`${API}/api/notifications/${id}/read`, { method: 'POST' });
+  } catch {}
+  loadNotifications();
+  closeNotifDropdown();
+
+  // Navigate based on link
+  if (link.startsWith('run:')) {
+    const runId = parseInt(link.split(':')[1]);
+    switchTab('runs');
+    showDetail(runId);
+  } else if (link.startsWith('portal:')) {
+    const reqId = parseInt(link.split(':')[1]);
+    switchTab('portal');
+    setTimeout(() => openRequest(reqId), 300);
+  }
+}
+
+async function markAllRead() {
+  try {
+    await fetch(`${API}/api/notifications/read-all`, { method: 'POST' });
+    loadNotifications();
+  } catch {}
+}
+
+// ═══════ Resolve Question → Knowledge Base ═══════
+
+let resolveNotifId = null;
+
+function openResolve(notifId, questionText) {
+  resolveNotifId = notifId;
+  document.getElementById('resolveQuestion').textContent = questionText;
+  document.getElementById('resolveAnswer').value = '';
+  document.getElementById('resolveOverlay').classList.add('open');
+}
+
+function closeResolve() {
+  document.getElementById('resolveOverlay').classList.remove('open');
+  resolveNotifId = null;
+}
+
+async function submitResolve() {
+  if (!resolveNotifId) return;
+  const answer = document.getElementById('resolveAnswer').value.trim();
+  if (!answer) { alert('Please type an answer'); return; }
+  try {
+    const res = await fetch(`${API}/api/notifications/${resolveNotifId}/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer }),
+    });
+    const data = await res.json();
+    if (data.status === 'resolved') {
+      closeResolve();
+      loadNotifications();
+    }
+  } catch (e) { console.error('Resolve error:', e); }
+}
+
+// ═══════ AI Chat Functions ═══════
+
+let chatLoaded = false;
+
+async function loadChatHistory() {
+  if (chatLoaded) return;
+  try {
+    const res = await fetch(`${API}/api/chat`);
+    const messages = await res.json();
+    if (messages.length > 0) {
+      const container = document.getElementById('aiChatMessages');
+      container.innerHTML = '';
+      messages.forEach(m => appendChatBubble(m.role, m.content, m.created_at));
+      scrollChatBottom();
+    }
+    chatLoaded = true;
+  } catch (e) { console.error('Chat load error:', e); }
+}
+
+function appendChatBubble(role, content, time) {
+  const container = document.getElementById('aiChatMessages');
+  // Remove welcome if present
+  const welcome = container.querySelector('.ai-chat-welcome');
+  if (welcome) welcome.remove();
+
+  const div = document.createElement('div');
+  div.className = `ai-chat-msg ${role}`;
+  let html = esc(content);
+  if (time) html += `<div class="msg-time">${fmtDate(time)}</div>`;
+  if (role === 'assistant') {
+    html += ` <button class="save-to-kb-btn" onclick="saveChatToKB(this)">💾 Save to KB</button>`;
+  }
+  div.innerHTML = html;
+  container.appendChild(div);
+}
+
+function scrollChatBottom() {
+  const c = document.getElementById('aiChatMessages');
+  c.scrollTop = c.scrollHeight;
+}
+
+async function sendChat() {
+  const input = document.getElementById('aiChatInput');
+  const btn = document.getElementById('aiChatSendBtn');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  btn.disabled = true;
+
+  // Show user message
+  appendChatBubble('user', msg);
+  scrollChatBottom();
+
+  // Show typing indicator
+  const container = document.getElementById('aiChatMessages');
+  const typing = document.createElement('div');
+  typing.className = 'ai-chat-typing';
+  typing.textContent = '🤖 Thinking...';
+  container.appendChild(typing);
+  scrollChatBottom();
+
+  try {
+    const res = await fetch(`${API}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+    });
+    const data = await res.json();
+    typing.remove();
+    appendChatBubble('assistant', data.content);
+    scrollChatBottom();
+    // Refresh notifications in case AI asked a question
+    loadNotifications();
+  } catch (e) {
+    typing.remove();
+    appendChatBubble('assistant', 'Sorry, something went wrong. Please try again.');
+    scrollChatBottom();
+    console.error('Chat error:', e);
+  }
+  btn.disabled = false;
+  input.focus();
+}
+
+function chatSuggestion(btn) {
+  document.getElementById('aiChatInput').value = btn.textContent;
+  sendChat();
+}
+
+async function clearChat() {
+  if (!confirm('Clear all chat history?')) return;
+  await fetch(`${API}/api/chat`, { method: 'DELETE' });
+  chatLoaded = false;
+  document.getElementById('aiChatMessages').innerHTML = `
+    <div class="ai-chat-welcome">
+      <h4>🤖 Hi! I'm your project AI assistant</h4>
+      <p>I have full access to your pipeline runs, project files, client data, deployment configs, and code.<br>Ask me anything or tell me what I need to know!</p>
+      <div class="ai-chat-suggestions">
+        <button onclick="chatSuggestion(this)">Show me all projects on disk</button>
+        <button onclick="chatSuggestion(this)">What was the last project built?</button>
+        <button onclick="chatSuggestion(this)">How's the pipeline performing?</button>
+        <button onclick="chatSuggestion(this)">Any client requests pending?</button>
+        <button onclick="chatSuggestion(this)">What do you need from me?</button>
+        <button onclick="chatSuggestion(this)">What files did the latest project generate?</button>
+      </div>
+    </div>`;
+}
+
+function saveChatToKB(btn) {
+  const msgDiv = btn.closest('.ai-chat-msg');
+  const answer = msgDiv.textContent.replace(/💾 Save to KB$/, '').replace(/\d{1,2}\/\d{1,2}.*$/, '').trim();
+  // Find the previous user message
+  const allMsgs = [...document.querySelectorAll('.ai-chat-msg')];
+  const idx = allMsgs.indexOf(msgDiv);
+  let question = 'Chat Q&A';
+  for (let i = idx - 1; i >= 0; i--) {
+    if (allMsgs[i].classList.contains('user')) {
+      question = allMsgs[i].textContent.replace(/\d{1,2}\/\d{1,2}.*$/, '').trim();
+      break;
+    }
+  }
+  const cat = prompt('Category (general, payment, ecommerce, auth, database, deployment, integration, realtime, media):', 'general');
+  if (cat === null) return;
+  fetch(`${API}/api/chat/save-to-kb`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category: cat || 'general', question, answer }),
+  }).then(() => {
+    btn.textContent = '✅ Saved!';
+    btn.disabled = true;
+    loadKnowledge();
+  });
+}
+
+// ═══════ Knowledge Base Functions ═══════
+
+async function loadKnowledge() {
+  try {
+    const [listRes, summaryRes] = await Promise.all([
+      fetch(`${API}/api/knowledge`),
+      fetch(`${API}/api/knowledge/summary`),
+    ]);
+    const entries = await listRes.json();
+    const summary = await summaryRes.json();
+    renderKBStats(summary);
+    renderKBGrid(entries);
+    loadAIQuestions();
+    loadChatHistory();
+  } catch (e) { console.error('KB load error:', e); }
+}
+
+async function loadAIQuestions() {
+  try {
+    const res = await fetch(`${API}/api/knowledge/questions`);
+    const questions = await res.json();
+    renderAIQuestions(questions);
+  } catch (e) { console.error('AI questions load error:', e); }
+}
+
+function renderAIQuestions(questions) {
+  const list = document.getElementById('aiQList');
+  const showResolved = document.getElementById('aiQShowResolved').checked;
+  const pending = questions.filter(q => !q.resolved);
+  const resolved = questions.filter(q => q.resolved);
+  const visible = showResolved ? questions : pending;
+
+  document.getElementById('aiQBadge').textContent = pending.length;
+  document.getElementById('aiQBadge').style.background = pending.length > 0 ? 'var(--yellow-dim)' : 'var(--green-dim)';
+  document.getElementById('aiQBadge').style.color = pending.length > 0 ? 'var(--yellow)' : 'var(--green)';
+
+  if (!visible.length) {
+    list.innerHTML = pending.length === 0
+      ? '<div class="ai-q-empty">✅ The AI has no pending questions — all caught up! Run a pipeline to generate new questions.</div>'
+      : '<div class="ai-q-empty">No pending questions. Check "Show answered" to see resolved ones.</div>';
+    return;
+  }
+
+  list.innerHTML = visible.map(q => {
+    // Extract stage from message like "[Scout] ..."
+    const stageMatch = q.message.match(/^\[(\w+)\]/);
+    const stage = stageMatch ? stageMatch[1] : '';
+    // Extract the snippet (after the project name dash)
+    const snippetMatch = q.message.match(/—\s*(.+)$/s);
+    const snippet = snippetMatch ? snippetMatch[1].trim() : q.message;
+    const titleClean = (q.title || '').replace(/^AI Needs Input:\s*/i, '');
+
+    if (q.resolved) {
+      return `
+      <div class="ai-q-item resolved">
+        <div class="ai-q-item-header">
+          ${stage ? `<span class="ai-q-stage">${esc(stage)}</span>` : ''}
+          <span class="ai-q-time">${fmtDate(q.created_at)}</span>
+        </div>
+        <div class="ai-q-title">✅ ${esc(titleClean)}</div>
+        <div class="ai-q-snippet">${esc(snippet)}</div>
+        <div class="ai-q-resolved-answer">💡 Answered — knowledge saved</div>
+      </div>`;
+    }
+
+    return `
+    <div class="ai-q-item pending">
+      <div class="ai-q-item-header">
+        ${stage ? `<span class="ai-q-stage">${esc(stage)}</span>` : ''}
+        <span class="ai-q-time">${fmtDate(q.created_at)}</span>
+      </div>
+      <div class="ai-q-title">❓ ${esc(titleClean)}</div>
+      <div class="ai-q-snippet">${esc(snippet)}</div>
+      <div class="ai-q-answer-box">
+        <textarea id="aiQA_${q.id}" placeholder="Teach the AI — type your answer here..."></textarea>
+        <button onclick="answerAIQuestion(${q.id})">💡 Teach AI</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function answerAIQuestion(notifId) {
+  const ta = document.getElementById('aiQA_' + notifId);
+  const answer = ta.value.trim();
+  if (!answer) { alert('Please type an answer to teach the AI'); return; }
+  const btn = ta.parentElement.querySelector('button');
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/api/notifications/${notifId}/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer }),
+    });
+    const data = await res.json();
+    if (data.status === 'resolved') {
+      loadKnowledge();
+      loadNotifications();
+    } else {
+      alert('Failed to save: ' + (data.error || 'Unknown error'));
+      btn.textContent = '💡 Teach AI';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    console.error('Answer error:', e);
+    btn.textContent = '💡 Teach AI';
+    btn.disabled = false;
+  }
+}
+
+function renderKBStats(summary) {
+  const el = document.getElementById('kbStats');
+  const unanswered = summary.unanswered_questions || 0;
+  let html = '';
+  if (unanswered > 0) {
+    html += `<div class="kb-stat" style="border-color:rgba(234,179,8,.3)"><div class="kb-stat-val" style="color:var(--yellow)">${unanswered}</div><div class="kb-stat-lbl">Needs Answer</div></div>`;
+  }
+  html += `<div class="kb-stat"><div class="kb-stat-val">${summary.total}</div><div class="kb-stat-lbl">Total Entries</div></div>`;
+  const cats = summary.categories || {};
+  for (const [cat, count] of Object.entries(cats)) {
+    html += `<div class="kb-stat"><div class="kb-stat-val">${count}</div><div class="kb-stat-lbl">${esc(cat)}</div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderKBGrid(entries) {
+  const grid = document.getElementById('kbGrid');
+  if (!entries.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:2rem;text-align:center">No knowledge entries yet. Answer the AI\'s questions above or add entries manually.</div>';
+    return;
+  }
+  grid.innerHTML = entries.map(e => `
+    <div class="kb-card">
+      <span class="kb-card-cat">${esc(e.category)}</span>
+      <div class="kb-card-q">❓ ${esc(e.question)}</div>
+      <div class="kb-card-a">💡 ${esc(e.answer)}</div>
+      <div class="kb-card-meta">
+        <span>Added ${fmtDate(e.created_at)}${e.source === 'resolved_notification' ? ' • from AI question' : e.source === 'manual' ? ' • manual' : ''}</span>
+        <div class="kb-card-actions">
+          <button onclick="editKB(${e.id}, this)">Edit</button>
+          <button class="delete" onclick="deleteKB(${e.id})">Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addKnowledge() {
+  const q = document.getElementById('kbQuestion').value.trim();
+  const a = document.getElementById('kbAnswer').value.trim();
+  const cat = document.getElementById('kbCategory').value;
+  if (!q || !a) { alert('Please fill in both question and answer'); return; }
+  try {
+    await fetch(`${API}/api/knowledge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: cat, question: q, answer: a }),
+    });
+    document.getElementById('kbQuestion').value = '';
+    document.getElementById('kbAnswer').value = '';
+    loadKnowledge();
+  } catch (e) { console.error('KB add error:', e); }
+}
+
+async function editKB(id, btn) {
+  const card = btn.closest('.kb-card');
+  const currentAnswer = card.querySelector('.kb-card-a').textContent.replace(/^💡\s*/, '');
+  const newAnswer = prompt('Update the answer:', currentAnswer);
+  if (newAnswer !== null && newAnswer.trim()) {
+    await fetch(`${API}/api/knowledge/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer: newAnswer.trim() }),
+    });
+    loadKnowledge();
+  }
+}
+
+async function deleteKB(id) {
+  if (!confirm('Delete this knowledge entry? The AI will no longer use it.')) return;
+  await fetch(`${API}/api/knowledge/${id}`, { method: 'DELETE' });
+  loadKnowledge();
+}
+</script>
+</body>
+</html>
