@@ -836,6 +836,29 @@ function renderStats(s, runs) {
   }).join('');
 }
 
+function getRunFailureReason(run) {
+  if (!run) return '';
+  if (run.error_message && String(run.error_message).trim()) {
+    return String(run.error_message).trim();
+  }
+
+  if (!run.result_json) return '';
+  try {
+    const parsed = JSON.parse(run.result_json);
+    const payload = Array.isArray(parsed) ? parsed[0] : parsed;
+    const bugs = Array.isArray(payload?.bugs) ? payload.bugs : [];
+    if (bugs.length) {
+      const first = bugs[0] || {};
+      const description = String(first.description || first.id || '').trim();
+      if (description) return description;
+    }
+    const generic = String(payload?.message || payload?.error || '').trim();
+    if (generic) return generic;
+  } catch {}
+
+  return '';
+}
+
 function renderRuns(runs) {
   const tbody = document.getElementById('runsBody');
   if (!runs.length) {
@@ -852,11 +875,15 @@ function renderRuns(runs) {
     }
     const budget = r.budget_usd ? `$${Number(r.budget_usd).toLocaleString()}` : '—';
     const client = r.client_name || '—';
+    const failureReason = getRunFailureReason(r);
+    const failureReasonHtml = (r.status === 'fail' || r.status === 'error') && failureReason
+      ? `<div style="font-size:.68rem;color:var(--red);margin-top:.15rem;max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(failureReason)}">Reason: ${esc(failureReason)}</div>`
+      : '';
     return `
     <tr class="clickable" onclick="showDetail(${r.id})">
       <td class="mono">#${r.id}</td>
       <td><span class="badge ${r.status}">${r.status}</span></td>
-      <td><span class="project-name" title="${esc(pName)}">${esc(pName) || '—'}</span></td>
+      <td><span class="project-name" title="${esc(pName)}">${esc(pName) || '—'}</span>${failureReasonHtml}</td>
       <td style="color:var(--muted);font-size:.75rem">${esc(client)}</td>
       <td class="budget">${budget}</td>
       <td>${fmtDate(r.started_at)}</td>
@@ -906,6 +933,10 @@ function renderProjects(runs) {
     const client = r.client_name || '';
     const src = guessSource(r);
     const sel = selectedProjectId === r.id ? ' selected' : '';
+    const failureReason = getRunFailureReason(r);
+    const failureReasonHtml = (r.status === 'fail' || r.status === 'error') && failureReason
+      ? `<div style="margin-top:.35rem;font-size:.7rem;color:var(--red);line-height:1.4">Why failed: ${esc(failureReason)}</div>`
+      : '';
 
     // Mini pipeline phase progress bar
     const stageNames = ['scout', 'analyst', 'closer', 'builder', 'auditor'];
@@ -963,6 +994,7 @@ function renderProjects(runs) {
           <span style="font-size:.65rem;color:var(--muted)">${r.files_generated || 0} files</span>
           <span style="font-size:.65rem;color:${r.tests_run > 0 && r.tests_passed === r.tests_run ? 'var(--green)' : r.tests_failed > 0 ? 'var(--red)' : 'var(--muted)'}">${r.tests_passed}/${r.tests_run} tests</span>
         </div>
+        ${failureReasonHtml}
         <div style="margin-top:.3rem;display:flex;align-items:center;gap:2px;">${miniStages}</div>
       </div>
     </div>`;
@@ -1021,6 +1053,7 @@ function renderProjectProfile(col, p) {
   const client = run.client_name || '—';
   const techStack = run.tech_stack || '';
   const desc = run.description || p.lead_description || '';
+  const failureReason = getRunFailureReason(run);
 
   // Pipeline stages progress
   const stageNames = ['scout', 'analyst', 'closer', 'builder', 'auditor'];
@@ -1160,6 +1193,15 @@ function renderProjectProfile(col, p) {
     </div>`;
   }
 
+  let failureHtml = '';
+  if ((run.status === 'fail' || run.status === 'error') && failureReason) {
+    failureHtml = `
+    <div class="pd-section">
+      <div class="pd-section-title">❌ Why Setup Failed</div>
+      <div class="error-block">${esc(failureReason)}</div>
+    </div>`;
+  }
+
   // Client Requirements (from Analyst analysis)
   let reqsHtml = '';
   if (clientReqs.length || analystSummary) {
@@ -1241,6 +1283,8 @@ function renderProjectProfile(col, p) {
       <div class="pd-section-title">⚙️ Pipeline Progress</div>
       <div class="pd-stages">${stagesHtml}</div>
     </div>
+
+    ${failureHtml}
 
     <div class="pd-section">
       <div class="pd-section-title">📄 Project Details</div>
@@ -1703,9 +1747,10 @@ async function showDetail(id) {
 
     // Error section
     const errSection = document.getElementById('dErrorSection');
-    if (r.error_message) {
+    const failureReason = getRunFailureReason(r);
+    if (failureReason) {
       errSection.style.display = '';
-      document.getElementById('dError').textContent = r.error_message;
+      document.getElementById('dError').textContent = failureReason;
     } else {
       errSection.style.display = 'none';
     }
