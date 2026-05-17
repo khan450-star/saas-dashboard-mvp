@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["python311", "nodejs-18_x", "npm-9_x"]
+
+[phases.install]
+cmds = [
+  "python -m pip install --upgrade pip",
+  "python -m pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "python -c \"import os, uvicorn; uvicorn.run('orchestrator:app', host='0.0.0.0', port=int(os.getenv('PORT', '8000')))\""
