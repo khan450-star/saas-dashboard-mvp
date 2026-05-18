@@ -218,7 +218,8 @@ def _load_sample_lead_fallback() -> list[dict]:
 
 def build_crew() -> Crew:
     """Assemble the full 5-phase crew with specialist models per agent."""
-    print(\"[Crew] Building 5-agent pipeline...\")\n    # Scout & Closer share the general/fallback model (communication-heavy)
+    print("[Crew] Building 5-agent pipeline...")
+    # Scout & Closer share the general/fallback model (communication-heavy)
     llm_general  = _get_llm()
     llm_architect = _get_llm(settings.architect_model)   # Claude Opus — system design
     llm_lead_dev  = _get_llm(settings.lead_dev_model)    # GPT-5.2-Codex — code gen
@@ -231,7 +232,7 @@ def build_crew() -> Crew:
     memory_text = db.get_active_knowledge_text()
 
     # Agents (each gets only the tools it needs)
-    print(\"[Crew] Creating agents...\")
+    print("[Crew] Creating agents...")
     scout   = create_scout_agent(tools=[scraper], llm=llm_general)
     analyst = create_analyst_agent(tools=[], llm=llm_architect)
     closer  = create_closer_agent(tools=[emailer], llm=llm_general)
@@ -239,7 +240,8 @@ def build_crew() -> Crew:
     auditor = create_auditor_agent(tools=[tester], llm=llm_qa)
 
     # Tasks (sequential — output of each feeds into the next)
-    print(\"[Crew] Creating tasks...\")\n    t1 = create_scout_task(scout)
+    print("[Crew] Creating tasks...")
+    t1 = create_scout_task(scout)
     t2 = create_analyst_task(analyst)
     t3 = create_closer_task(closer)
     t4 = create_builder_task(builder)
@@ -292,7 +294,8 @@ def build_crew() -> Crew:
         for task in [t2, t3, t4, t5]:  # analyst, closer, builder, auditor all benefit
             task.description += kb_block
 
-    print(\"[Crew] Assembly complete - ready to kickoff\")\n    return Crew(
+    print("[Crew] Assembly complete - ready to kickoff")
+    return Crew(
         agents=[scout, analyst, closer, builder, auditor],
         tasks=[t1, t2, t3, t4, t5],
         process=Process.sequential,
