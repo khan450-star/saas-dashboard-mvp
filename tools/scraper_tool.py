@@ -33,7 +33,11 @@ class ScraperTool(BaseTool):
     def _run(self, source: str = "upwork") -> str:
         if settings.tools_mock_mode:
             return self._mock_scrape()
-        return self._live_scrape(source)
+        try:
+            return self._live_scrape(source)
+        except Exception as e:
+            print(f"[ScraperTool] Live scrape failed: {e}. Falling back to mock data.")
+            return self._mock_scrape()
 
     # ── Mock implementation ──────────────────────────────────────────
     def _mock_scrape(self) -> str:
@@ -59,15 +63,24 @@ class ScraperTool(BaseTool):
                             timeout_polls: int = 60) -> list:
         """Start an Apify actor, poll until done, return dataset items."""
         token = settings.apify_api_token
+        if not token or token == "":
+            print(f"[ScraperTool] No Apify API token - cannot scrape live data")
+            return []
+        
         run_url = f"https://api.apify.com/v2/acts/{actor_id}/runs"
 
-        run_resp = httpx.post(
-            run_url,
-            params={"token": token},
-            json=input_json,
-            timeout=30,
-        )
-        run_resp.raise_for_status()
+        try:
+            run_resp = httpx.post(
+                run_url,
+                params={"token": token},
+                json=input_json,
+                timeout=30,
+            )
+            run_resp.raise_for_status()
+        except httpx.HTTPError as e:
+            print(f"[ScraperTool] Apify API error: {e}")
+            return []
+        
         run_data = run_resp.json()["data"]
         dataset_id = run_data["defaultDatasetId"]
         run_id = run_data["id"]
