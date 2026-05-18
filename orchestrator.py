@@ -299,7 +299,7 @@ def build_crew() -> Crew:
         agents=[scout, analyst, closer, builder, auditor],
         tasks=[t1, t2, t3, t4, t5],
         process=Process.sequential,
-        verbose=True,
+        verbose=False,  # Reduce log output to prevent Railway rate limiting
     )
 
 
