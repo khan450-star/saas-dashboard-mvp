@@ -218,6 +218,8 @@ def _load_sample_lead_fallback() -> list[dict]:
 
 def build_crew() -> Crew:
     """Assemble the full 5-phase crew with specialist models per agent."""
+    global _current_activity
+    _current_activity = "building crew"
     print("[Crew] Building 5-agent pipeline...")
     # Scout & Closer share the general/fallback model (communication-heavy)
     llm_general  = _get_llm()
@@ -305,7 +307,8 @@ def build_crew() -> Crew:
 
 def run_pipeline() -> dict:
     """Execute the full pipeline, then self-heal if QA finds bugs."""
-    global _running_run_id
+    global _running_run_id, _current_activity
+    _current_activity = "starting pipeline"
     # Reuse pre-created run_id from trigger endpoint, or create a new one (CLI)
     with _running_lock:
         if _running_run_id is not None:
@@ -324,11 +327,13 @@ def run_pipeline() -> dict:
             db.update_current_phase(run_id, phase)
             if idx == 0:
                 # kickoff runs all tasks in CrewAI sequential process
+                _current_activity = f"executing scout agent (run #{run_id})"
                 print(f"[Run #{run_id}] Starting CrewAI kickoff - scout agent will call Anthropic API")
                 import time
                 start_time = time.time()
                 result = crew.kickoff()
                 elapsed = time.time() - start_time
+                _current_activity = "processing scout results"
                 print(f"[Run #{run_id}] CrewAI kickoff completed in {elapsed:.1f}s")
                 result_str = str(result)
                 break
@@ -826,6 +831,7 @@ DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 # Track in-flight pipeline run
 _running_lock = threading.Lock()
 _running_run_id: int | None = None
+_current_activity: str = "idle"  # Tracks what the pipeline is doing in real-time
 _scheduler_started = False
 
 
@@ -971,6 +977,8 @@ def _bg_pipeline():
     try:
         run_pipeline()
     finally:
+        global _current_activity
+        _current_activity = "idle"
         with _running_lock:
             _running_run_id = None
 
@@ -995,6 +1003,7 @@ async def trigger_pipeline_endpoint(lead: LeadWebhook | None = None):
 
 @app.get("/api/health")
 async def health():
+    global _current_activity
     reconciled = _reconcile_stale_running_runs()
     with _running_lock:
         running = _running_run_id
@@ -1021,6 +1030,7 @@ async def health():
         "storage_backend": db.storage_backend(),
         "pipeline_running": running is not None,
         "current_run_id": running,
+        "current_activity": _current_activity,  # Shows what process is running
         "stale_runs_reconciled": reconciled,
         "output_dir": str(output_dir),
         "projects_on_disk": projects_on_disk,
